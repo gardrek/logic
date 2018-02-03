@@ -1,3 +1,8 @@
+-- This library stops you from (accidentally) creating globals
+require('noglobals')
+
+rawset(_G, '_ALLOWGLOBALS', false)
+
 local value = {}
 value.__index = value
 --setmetatable(value, value)
@@ -18,7 +23,11 @@ end
 
 function value:setvoltage(v)
   -- DEBUG
-  if v > 1.0 or v < -1.0 then error('E: attempt to set value outside range') end
+  if v > 1.0 or v < -1.0 then
+    error('E: attempt to set value outside range')
+    --print('W: attempt to set value outside range ' .. tostring(v))
+    --v = self.clamp(v)
+  end
   self.voltage = v
 end
 
@@ -26,16 +35,22 @@ function value:getvoltage()
   return self.voltage
 end
 
+function value:setColor(c)
+  self.color = {c[1], c[2], c[3]}
+end
+
+--[[
 function value:dup(val)
-  if not val then
-    val = {}
+  val = val or {}
+  if not getmetatable(val) then
     setmetatable(val, getmetatable(self))
   end
   self.set(val, self)
   return val
-end
+end--]]
 
 function value:set(other)
+  if not other then error('Required argument "other" to value:set', 2) end
   if other.getvoltage then
     self.voltage = other:getvoltage()
   elseif other.voltage then
@@ -69,11 +84,12 @@ function value:__tostring()
 end
 
 function value:drawNode(x, y, scale)
-  scale = scale or 1
+  scale = scale / 48 or 1
   local v = self:getvoltage()
   local mag = math.abs(v)
   local vColor = {self.color[1] * mag, self.color[2] * mag, self.color[3] * mag}
   love.graphics.setColor(self.color)
+  --[==[
   if v < 0 then
     love.graphics.rectangle('fill', x - 6 * scale, y - 6 * scale, 6 * scale, 6 * scale)
     love.graphics.rectangle('fill', x, y, 6 * scale, 6 * scale)
@@ -83,15 +99,12 @@ function value:drawNode(x, y, scale)
     love.graphics.rectangle('fill', x - 6 * scale, y, 12 * scale, 6 * scale)
     --]]
   end
+  --]==]
   love.graphics.circle('fill', x, y, 6 * scale)
   love.graphics.setColor(vColor)
   love.graphics.circle('fill', x, y, 4 * scale)
 end
 
-local qqq = {
-  value:new(),
-  value:new(0.23),
-  value:new(20),
-}
+rawset(_G, '_ALLOWGLOBALS', true)
 
 return value
