@@ -297,29 +297,11 @@ logic.components = {
       else
         node = self.default
       end
-      local voltage = node:getvoltage()
-      local x, y = drawx + self.w * scale / 2, drawy + self.h * scale / 2
-      local shapeWidth = scale / 2 * self.w / 2
-      love.graphics.setLineWidth(scale / 16)
-      love.graphics.setColor(self.color)
-      if voltage == 0.0 then
-        love.graphics.circle('line', x, y, shapeWidth)
-      else
-        if voltage > 0.0 then
-          love.graphics.rectangle('fill',
-            x - shapeWidth / 5,
-            y - shapeWidth,
-            shapeWidth / 5 * 2,
-            shapeWidth * 2
-          )
-        end
-        love.graphics.rectangle('fill',
-          x - shapeWidth,
-          y - shapeWidth / 5,
-          shapeWidth * 2,
-          shapeWidth / 5 * 2
-        )
-      end
+
+      logic:drawSignSymbol(node,
+        drawx + self.w * scale / 2, drawy + self.h * scale / 2,
+        scale, self.w * 0.5, self.color
+      )
     end
   },
 
@@ -794,6 +776,31 @@ function logic.drawWire(offx, offy, scale, val, points)
   love.graphics.setColor(vColor)
   love.graphics.setLineWidth(scale / 8)
   love.graphics.line(points)
+end
+
+function logic:drawSignSymbol(node, x, y, scale, shapeWidth, color)
+  local voltage = node:getvoltage()
+  shapeWidth = scale * shapeWidth * 0.5
+  love.graphics.setLineWidth(scale / 16)
+  love.graphics.setColor(color)
+  if voltage == 0.0 then
+    love.graphics.circle('line', x, y, shapeWidth)
+  else
+    if voltage > 0.0 then
+      love.graphics.rectangle('fill',
+        x - shapeWidth / 5,
+        y - shapeWidth,
+        shapeWidth / 5 * 2,
+        shapeWidth * 2
+      )
+    end
+    love.graphics.rectangle('fill',
+      x - shapeWidth,
+      y - shapeWidth / 5,
+      shapeWidth * 2,
+      shapeWidth / 5 * 2
+    )
+  end
 end
 
 rawset(_G, '_ALLOWGLOBALS', true)

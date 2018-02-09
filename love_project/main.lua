@@ -256,7 +256,7 @@ end
 
 function love.wheelmoved(x, y)
   if love.keyboard.isDown('lctrl') or love.keyboard.isDown('rctrl') then
-    mainboard.scale = mainboard.scale - 8 * y
+    mainboard.scale = mainboard.scale + 8 * y
     if mainboard.scale <= 0 then mainboard.scale = 8 end
   else
     local dx, dy =  x * mainboard.scale / 4, y * mainboard.scale / 4
