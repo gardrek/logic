@@ -298,7 +298,7 @@ logic.components = {
         node = self.default
       end
 
-      logic:drawSignSymbol(node,
+      logic.drawSignSymbol(node,
         drawx + self.w * scale / 2, drawy + self.h * scale / 2,
         scale, self.w * 0.5, self.color
       )
@@ -501,6 +501,96 @@ logic.components = {
         (self.w * scale - 10 * padding) * math.abs(length),
         self.h * scale - 10 * padding
       )
+    end,
+  },
+
+  Multimeter = {
+    displayName = 'Multimeter',
+    w = 2, h = 2,
+    color = colors.FullWhite,
+    inputs = 1,
+    update = function(self)
+      local node
+      if self.input[1] and self.input[1].link then
+        node = self.input[1].link.val
+      else
+        node = self.input[1].default
+      end
+      self.color = node.color
+    end,
+    draw = function(self, offx, offy, scale)
+      local drawx, drawy = self.x * scale + offx, self.y * scale + offy
+      local node
+      if self.input[1] and self.input[1].link then
+        node = self.input[1].link.comp.output[self.input[1].link.index]
+      else
+        node = self.input[1].default
+      end
+      local length = node:getvoltage()
+      local padding = scale / 32
+      love.graphics.setColor(colors.Black)
+      love.graphics.rectangle(
+        'fill', drawx + 2 * padding, drawy + 2 * padding,
+        self.w * scale - 4 * padding, self.h * scale - 4 * padding
+      )
+      love.graphics.setColor(node.color)
+      love.graphics.setLineWidth(padding)
+      love.graphics.rectangle(
+        'line', drawx + 2 * padding, drawy + 2 * padding,
+        self.w * scale - 4 * padding, self.h * scale - 4 * padding
+      )
+
+      logic.drawSignSymbol(node,
+        drawx + (self.w / 4) * scale, drawy + (self.h / 4) * scale,
+        scale, self.h / 4, node.color
+      )
+
+      local brightness = math.abs(node:getvoltage())
+      love.graphics.setColor({
+        node.color[1] * brightness,
+        node.color[2] * brightness,
+        node.color[3] * brightness,
+      })
+      love.graphics.circle('fill',
+        drawx + (self.w * 3 / 4) * scale, drawy + (self.h / 4) * scale,
+        self.h / 8 * scale
+      )
+
+      love.graphics.setColor(node.color)
+      love.graphics.setLineWidth(padding * 2)
+      love.graphics.circle('line',
+        drawx + (self.w * 3 / 4) * scale, drawy + (self.h / 4) * scale,
+        self.h / 8 * scale
+      )
+
+      love.graphics.rectangle(
+        'fill',
+        drawx + 5 * padding,
+        drawy + (self.h / 2) * scale + 5 * padding,
+        (self.w * scale - 10 * padding) * math.abs(length),
+        (self.h / 2) * scale - 10 * padding
+      )
+
+      love.graphics.setLineWidth(padding)
+      local lineX, lineY
+      for i = 0, 2 do
+        lineX, lineY = 
+          drawx + (self.w * scale - 10 * padding) / 2 * i + 5 * padding,
+          drawy + (self.h / 2) * scale + 4 * padding
+        love.graphics.line(
+          lineX, lineY,
+          lineX, lineY - 5 * padding
+        )
+        if i < 2 then
+        lineX, lineY = 
+          drawx + (self.w * scale - 10 * padding) / 2 * i + 2.5 * padding + (self.w * scale) / 4,
+          drawy + (self.h / 2) * scale + 4 * padding
+          love.graphics.line(
+            lineX, lineY,
+            lineX, lineY - 3 * padding
+          )
+        end
+      end
     end,
   },
 }
@@ -778,7 +868,7 @@ function logic.drawWire(offx, offy, scale, val, points)
   love.graphics.line(points)
 end
 
-function logic:drawSignSymbol(node, x, y, scale, shapeWidth, color)
+function logic.drawSignSymbol(node, x, y, scale, shapeWidth, color)
   local voltage = node:getvoltage()
   shapeWidth = scale * shapeWidth * 0.5
   love.graphics.setLineWidth(scale / 16)

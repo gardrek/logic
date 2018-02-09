@@ -134,7 +134,7 @@ function love.load()
     'PassThru',
     'NOT', 'Negate', 'Truth', 'ABS', 'Sign',
     'OR', 'AND', 'AVG', 'SignSplit',
-    'LED', 'ProgBar',
+    'LED', 'ProgBar', 'Multimeter',
   }
   local placementy = 1
   local obj
@@ -169,7 +169,6 @@ function love.draw()
   love.graphics.clear{0x22, 0x22, 0x22}
   mainboard:draw()
   love.graphics.setColor{0xff, 0xff, 0xff}
-  love.graphics.print(mainboard.scale, 0, 0)
   if SHOW_DEBUG_TEXT then
     love.graphics.draw(unicorn.image, unicorn.x, unicorn.y)
     love.graphics.print(tostring(mouse.x), 600, 100)
