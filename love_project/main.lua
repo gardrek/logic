@@ -3,9 +3,21 @@
 -- This library stops you from (accidentally) creating globals
 require('noglobals')
 
+do -- This way the printed text won't look janky due to non-integer coords
+  local old_print = love.graphics.print
+  love.graphics.print = function(text, x, y, ...)
+    old_print(text, math.floor(x + 0.5), math.floor(y + 0.5), ...)
+  end
+end
+
 rawset(_G, '_ALLOWGLOBALS', true)
 
-SHOW_DEBUG_TEXT = true
+SHOW_DEBUG_TEXT = false
+NO_COLOR_MODE = false
+
+-- TODO: either switch over to using vectors, or remove this
+--vec2 = require('vec2')
+vector = require('vector')
 
 -- list of colors for theming, etc
 colors = require('colors')
@@ -20,8 +32,8 @@ logic = require('logic')
 inspect = require('inspect')
 
 mainboard = {
-  x = 0, y = 0,
-  scale = 48,
+  x = 20, y = 20,
+  scale = 8,
   components = {},
 }
 
@@ -31,6 +43,7 @@ mouse = {
   pressed = {},
   down = {},
   number_of_buttons = 3, -- TODO: make this not necessarily constant? controls change based on number of buttons available?
+  scroll_speed = 10,
 }
 
 rawset(_G, '_ALLOWGLOBALS', false)
@@ -38,9 +51,9 @@ rawset(_G, '_ALLOWGLOBALS', false)
 function mainboard:draw()
   for _, func in ipairs{
     'draw',
-    'drawWires',
     'drawOutputNodes',
     'drawInputNodes',
+    'drawWires',
   } do
     for _, obj in ipairs(self.components) do
       obj[func](obj, self.x, self.y, self.scale)
@@ -54,6 +67,16 @@ function mainboard:draw()
     obj:draw(self.x, self.y, self.scale)
   end
   --]]
+end
+
+function mainboard:each()
+  return function(self, i)
+      i = i + 1
+      local v = self[i]
+      if v then
+        return i, v
+      end
+    end, self, 0
 end
 
 function mainboard:insert(comp)
@@ -87,6 +110,7 @@ function love.load()
 
   mouse:init()
 
+  --[[
   local mouse0 = mainboard:insertNew('Mouse', 1, 3)
   local gate0 = mainboard:insertNew('OR', 5, 2)
   local gate1 = mainboard:insertNew('NOT', 9, 3)
@@ -101,19 +125,53 @@ function love.load()
   mouse0:link(2, gate2, 2)
 
   --mouse0:unlinkAll()
+  --]]
+
+  mainboard:insertNew('Mouse', 1, 1)
+  mainboard:insertNew('Joypad', 1, 6)
+
+  local name = {
+    'PassThru',
+    'NOT', 'Negate', 'Truth', 'ABS', 'Sign',
+    'OR', 'AND', 'AVG', 'SignSplit',
+    'LED', 'ProgBar',
+  }
+  local placementy = 1
+  local obj
+  for yi in ipairs(name) do
+    for xi = 0, 7 do
+      if name[yi] then
+        obj = mainboard:insertNew(name[yi], xi * 3 + 5, placementy)
+      end
+    end
+    if name[yi] then
+      placementy = placementy + logic.components[name[yi]].h
+    end
+  end
+
+  --[[
+  local inp1, out1, pin1, len
+  len = #mainboard.components
+  for i = 1, 256 do
+    inp1 = mainboard.components[love.math.random(2, len)]
+    out1 = mainboard.components[love.math.random(2, len)]
+    pin1 = love.math.random(1, 2)
+    inp1:link(1, out1, pin1)
+  end
+  --]]
 
   unicorn.image = love.graphics.newImage('unicorn.png')
-  unicorn.x = love.graphics.getWidth() / 2
-  unicorn.y = love.graphics.getHeight() / 8 * 7
+  unicorn.x = 0--love.graphics.getWidth() / 2
+  unicorn.y = 0--love.graphics.getHeight() / 8 * 7
 end
 
 function love.draw()
   love.graphics.clear{0x22, 0x22, 0x22}
-  --onents:draw(mainboard.x, mainboard.y, mainboard.scale)
   mainboard:draw()
   love.graphics.setColor{0xff, 0xff, 0xff}
-  love.graphics.draw(unicorn.image, unicorn.x, unicorn.y)
+  love.graphics.print(mainboard.scale, 0, 0)
   if SHOW_DEBUG_TEXT then
+    love.graphics.draw(unicorn.image, unicorn.x, unicorn.y)
     love.graphics.print(tostring(mouse.x), 600, 100)
     love.graphics.print(tostring(mouse.y), 650, 100)
     for i = 1, mouse.number_of_buttons do
@@ -121,6 +179,19 @@ function love.draw()
       love.graphics.print(tostring(mouse.down[i]), 600 + (i - 1) * 40, 140)
     end
     love.graphics.print(tostring(mouse.heldobject), 600, 160)
+  end
+  if mouse.heldobject and mouse.heldobject.class == 'value' then
+    local x1, y1 = mouse.heldobject:Coords()
+    x1, y1 = (x1 * mainboard.scale) + mainboard.x, (y1 * mainboard.scale) + mainboard.y
+    logic:drawHangingWire(offx, offy, mainboard.scale, mouse.heldobject, x1, y1, mouse.x, mouse.y)
+    --[[logic.drawWire(offx, offy, mainboard.scale, mouse.heldobject, {
+      x1, y1,
+      x1 + 0.25 * mainboard.scale, y1,
+      mouse.x - 0.25 * mainboard.scale, mouse.y,
+      mouse.x, mouse.y
+    })]]
+    mouse.heldobject:drawIONode('o', x1, y1, mainboard.scale)
+    mouse.heldobject:drawIONode('arrow', mouse.x, mouse.y, mainboard.scale)
   end
 end
 
@@ -167,13 +238,32 @@ function love.update(dt)
   end
 end
 
+function love.keypressed(key, scancode, isrepeat)
+  if key == 'escape' then
+    love.event.quit()
+  elseif key == 'f5' then
+    love.event.quit('restart')
+  elseif key == 'f7' then
+    SHOW_DEBUG_TEXT = not SHOW_DEBUG_TEXT
+  elseif key == 'f6' then
+    NO_COLOR_MODE = not NO_COLOR_MODE
+  end
+end
+
 function love.mousepressed(x, y, button, isTouch)
   mouse.pressed[button] = true
 end
 
 function love.wheelmoved(x, y)
-  --mainboard.x, mainboard.y = mainboard.x + x * 5, mainboard.y + y * 5
-  mainboard.scale = mainboard.scale + y * 8
+  if love.keyboard.isDown('lctrl') or love.keyboard.isDown('rctrl') then
+    if y > 0 then
+      mainboard.scale = mainboard.scale + 8
+    elseif y < 0 then
+      mainboard.scale = mainboard.scale - 8
+    end
+  else
+    mainboard.x, mainboard.y = mainboard.x + x * mainboard.scale / 4, mainboard.y + y * mainboard.scale / 4
+  end
 end
 
 function mouse:init()
@@ -192,53 +282,88 @@ function mouse.update(mouse, board)
   local blocked = false
   if mouse.pressed[1] then
     if mouse.heldobject then
-      for index, obj in ipairs(board.components) do
-        if obj ~= mouse.heldobject then
-          x1, y1, x2, y2 =
-            mouse.heldobject.x, mouse.heldobject.y,
-            mouse.heldobject.x + mouse.heldobject.w, mouse.heldobject.y + mouse.heldobject.h
-          for index, obj in ipairs(board.components) do
-            if obj ~= mouse.heldobject then
-              if obj.x < x2 and obj.x + obj.w > x1 and obj.y < y2 and obj.y + obj.h > y1 then
-                print(obj.name)
-                blocked = true
-                break
+      if mouse.heldobject.class == 'component' then
+        for index, obj in ipairs(board.components) do
+          if obj ~= mouse.heldobject then
+            x1, y1, x2, y2 =
+              mouse.heldobject.x, mouse.heldobject.y,
+              mouse.heldobject.x + mouse.heldobject.w, mouse.heldobject.y + mouse.heldobject.h
+            for index, obj in ipairs(board.components) do
+              if obj ~= mouse.heldobject then
+                if obj.x < x2 and obj.x + obj.w > x1 and obj.y < y2 and obj.y + obj.h > y1 then
+                  blocked = true
+                  break
+                end
               end
             end
           end
         end
+        if not blocked then mouse.heldobject = nil end
+      elseif mouse.heldobject.class == 'value' then
+        for index, obj in ipairs(board.components) do
+          -- putting down wire
+          for indexI, inp in ipairs(obj.input) do
+            x1, y1 = obj:inputCoords(indexI)
+            x1, y1 = x1, y1
+            x2, y2 = (x1 + 1 / 4) * board.scale + board.x, (y1 + 1 / 4) * board.scale + board.y
+            x1, y1 = (x1 - 1 / 4) * board.scale + board.x, (y1 - 1 / 4) * board.scale + board.y
+            if mouse.x >= x1 and mouse.x < x2 and mouse.y >= y1 and mouse.y < y2 then
+              mouse.heldobject.parent:link(mouse.heldobject.index, obj, indexI)
+              --mouse.heldobject = nil
+              break
+            end
+          end
+        end
       end
-      if not blocked then mouse.heldobject = nil end
     else
       for index, obj in ipairs(board.components) do
-        -- picking up wires
+        -- picking up wire from output
         for indexO, val in ipairs(obj.output) do
           x1, y1 = obj:outputCoords(indexO)
-          x2, y2 = x1 + board.scale / 8, y1 + board.scale / 8
-          x1, y1 = x1 - board.scale / 8, y1 - board.scale / 8
+          x1, y1 = x1, y1
+          x2, y2 = (x1 + 1 / 4) * board.scale + board.x, (y1 + 1 / 4) * board.scale + board.y
+          x1, y1 = (x1 - 1 / 4) * board.scale + board.x, (y1 - 1 / 4) * board.scale + board.y
           if mouse.x >= x1 and mouse.x < x2 and mouse.y >= y1 and mouse.y < y2 then
-            error'sd'
-            mouse.heldobject = true --val
-            --obj:unlinkAll()
+            mouse.heldobject = val
             break
           end
         end
         if mouse.heldobject then break end
-        -- picking up components
+        -- picking up wire from input
+        for indexI, inp in ipairs(obj.input) do
+          x1, y1 = obj:inputCoords(indexI)
+          x1, y1 = x1, y1
+          x2, y2 = (x1 + 1 / 4) * board.scale + board.x, (y1 + 1 / 4) * board.scale + board.y
+          x1, y1 = (x1 - 1 / 4) * board.scale + board.x, (y1 - 1 / 4) * board.scale + board.y
+          if mouse.x >= x1 and mouse.x < x2 and mouse.y >= y1 and mouse.y < y2 then
+            if inp.link then
+              mouse.heldobject = inp.link.val
+              obj:unlinkInput(indexI)
+              break
+            end
+          end
+        end
+        if mouse.heldobject then break end
+        -- picking up component
         x1, y1, x2, y2 =
-          obj.x * board.scale + board.x, obj.y * board.scale + board.x,
-          (obj.x + obj.w) * board.scale + board.x, (obj.y + obj.h) * board.scale + board.x
+          obj.x * board.scale + board.x, obj.y * board.scale + board.y,
+          (obj.x + obj.w) * board.scale + board.x, (obj.y + obj.h) * board.scale + board.y
         if mouse.x >= x1 and mouse.x < x2 and mouse.y >= y1 and mouse.y < y2 then
           mouse.heldobject = obj
-          --obj:unlinkAll()
           break
         end
       end
     end
   elseif mouse.heldobject then
-    mouse.heldobject.x, mouse.heldobject.y =
-      math.floor((mouse.x - board.x) / board.scale - (mouse.heldobject.w / 2) + 0.5),
-      math.floor((mouse.y - board.y) / board.scale - (mouse.heldobject.h / 2) + 0.5)
+    if mouse.heldobject.class == 'component' then
+      mouse.heldobject.x, mouse.heldobject.y =
+        math.floor((mouse.x - board.x) / board.scale - (mouse.heldobject.w / 2) + 0.5),
+        math.floor((mouse.y - board.y) / board.scale - (mouse.heldobject.h / 2) + 0.5)
+    elseif mouse.heldobject.class == 'value' then
+      if mouse.pressed[2] then
+        mouse.heldobject = nil
+      end
+    end
   end
 
   for i = 1, mouse.number_of_buttons do

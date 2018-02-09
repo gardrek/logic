@@ -5,6 +5,7 @@ rawset(_G, '_ALLOWGLOBALS', false)
 
 local value = {}
 value.__index = value
+value.class = 'value'
 --setmetatable(value, value)
 
 local colors = require('colors')
@@ -83,26 +84,48 @@ function value:__tostring()
   return ("%.f%%"):format(self.voltage * 100)
 end
 
-function value:drawNode(x, y, scale)
-  scale = scale / 48 or 1
+function value:drawIONode(nodeType, x, y, radius)
+  local scale = radius / 32
   local v = self:getvoltage()
   local mag = math.abs(v)
   local vColor = {self.color[1] * mag, self.color[2] * mag, self.color[3] * mag}
-  love.graphics.setColor(self.color)
-  --[==[
-  if v < 0 then
-    love.graphics.rectangle('fill', x - 6 * scale, y - 6 * scale, 6 * scale, 6 * scale)
-    love.graphics.rectangle('fill', x, y, 6 * scale, 6 * scale)
+  local halfColor = {self.color[1] / 2, self.color[2] / 2, self.color[3] / 2}
+  if nodeType == 'i' then
+    love.graphics.setColor(self.color)
+    love.graphics.polygon('fill',
+      x + 1.5 * scale, y - 5 * scale,
+      x + 1.5 * scale, y + 5 * scale,
+      x - 3.5 * scale, y + 5 * scale,
+      x - 0.5 * scale, y + 1.5 * scale,
+      -- FIXME: ??? profit? literally no idea why ^^this y co-ordinate^^ works. tempted to say it's a float rounding artifact
+      x - 3.5 * scale, y - 5 * scale
+    )
+  elseif nodeType == 'o' then
+    love.graphics.setColor(self.color)
+    love.graphics.polygon('fill',
+      x + 4 * scale, y - 5.5 * scale,
+      x + 4 * scale, y + 5.5 * scale,
+      x - 1.5 * scale, y + 3.5 * scale,
+      x - 1.5 * scale, y - 3.5 * scale
+    )
     --[[
-    love.graphics.rectangle('fill', x - 6 * scale, y - 6 * scale, 12 * scale, 6 * scale)
-  elseif v > 0 then
-    love.graphics.rectangle('fill', x - 6 * scale, y, 12 * scale, 6 * scale)
+    love.graphics.setColor(vColor)
+    love.graphics.polygon('fill',
+      x + 4 * scale, y - 2 * scale,
+      x + 4 * scale, y + 2 * scale,
+      x + 0.5 * scale, y + 2 * scale,
+      x + 0.5 * scale, y - 2 * scale
+    )
     --]]
+  else
+    if nodeType ~= 'arrow' then print('value:drawIONode() falling back to node type "arrow"') end
+    love.graphics.setColor(self.color)
+    love.graphics.circle('fill', x, y, 7 * scale)
+    love.graphics.setColor(colors.Black)
+    love.graphics.circle('fill', x, y, 5 * scale)
+    love.graphics.setColor(self.color)--(vColor)
+    love.graphics.polygon('fill', x - 2 * scale, y - 3 * scale, x + 4 * scale, y, x - 2 * scale, y + 3 * scale)
   end
-  --]==]
-  love.graphics.circle('fill', x, y, 6 * scale)
-  love.graphics.setColor(vColor)
-  love.graphics.circle('fill', x, y, 4 * scale)
 end
 
 rawset(_G, '_ALLOWGLOBALS', true)
