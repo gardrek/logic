@@ -33,7 +33,7 @@ inspect = require('inspect')
 
 mainboard = {
   x = 20, y = 20,
-  scale = 8,
+  scale = 32,
   components = {},
 }
 
@@ -256,13 +256,15 @@ end
 
 function love.wheelmoved(x, y)
   if love.keyboard.isDown('lctrl') or love.keyboard.isDown('rctrl') then
-    if y > 0 then
-      mainboard.scale = mainboard.scale + 8
-    elseif y < 0 then
-      mainboard.scale = mainboard.scale - 8
-    end
+    mainboard.scale = mainboard.scale - 8 * y
+    if mainboard.scale <= 0 then mainboard.scale = 8 end
   else
-    mainboard.x, mainboard.y = mainboard.x + x * mainboard.scale / 4, mainboard.y + y * mainboard.scale / 4
+    local dx, dy =  x * mainboard.scale / 4, y * mainboard.scale / 4
+    if love.keyboard.isDown('lshift') or love.keyboard.isDown('rshift') then
+      mainboard.x, mainboard.y = mainboard.x + dy, mainboard.y + dx
+    else
+      mainboard.x, mainboard.y = mainboard.x + dx, mainboard.y + dy
+    end
   end
 end
 
