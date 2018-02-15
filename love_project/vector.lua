@@ -2,18 +2,17 @@
 local vector = {}
 setmetatable(vector, vector)
 
-vector.names = {'x', 'y', 'z', 'w'}
+vector.name = {
+  x = 1, y = 2, z = 3,
+}
 
 vector.__index = function(table, key)
-  for i = 1, #vector.names do
-    if key == vector.names[i] then
-      return table:getElement(i)
-    end
-  end
-  if table[key] then
-    return table[key]
-  elseif vector[key] then
-    return vector[key]
+  if vector.name[key] then
+    return rawget(table, vector.name[key])
+  elseif rawget(table, key) then
+    return rawget(table, key)
+  elseif rawget(vector, key) then
+    return rawget(vector, key)
   end
 end
 
@@ -26,23 +25,28 @@ function vector:new(t)
     end
     t = obj
   elseif type(t) ~= 'table' then
-    error('Bad argument to vector:new()', 2)
+    error('Bad argument to vector:new() of type ' .. type(t), 2)
   end
   obj = vector.dup(t)
-  setmetatable(obj, getmetable(self))
+  setmetatable(obj, getmetatable(self))
   return obj
+end
+
+vector.__call = function(...)
+  return vector:new(...)
 end
 
 function vector:dup()
   local obj = {}
-  for i = 1, #vector.names do
-    if self[vector.names[i]] then
-      obj[i] = self[vector.names[i]]
-    else
-      obj[i] = self[i]
+  for i = 1, #self do
+    obj[i] = self[i]
+  end
+  for n, i in pairs(vector.name) do
+    if self[vector.name[n]] then
+      obj[i] = self[vector.name[n]]
     end
   end
-  setmetatable(obj, getmetable(self))
+  setmetatable(obj, getmetatable(self))
   return obj
 end
 
@@ -54,82 +58,124 @@ function vector:setElement(i, v)
   self[i] = v
 end
 
-
-
-local vec2 = {}
-
-
-
-function vec2:mag()
-  return math.sqrt(self.x * self.x + self.y * self.y)
-end
-vec2.__len = vec2.mag
-
-function vec2:magsqr()
-  return self.x * self.x + self.y * self.y
+function vector:mag()
+  return math.sqrt(self:magsqr())
 end
 
-function vec2:rotate(angle)
-  local cs, sn, nx, ny
-  cs, sn = math.cos(angle), math.sin(angle)
-  nx = self.x * cs - self.y * sn
-  ny = self.x * sn + self.y * cs
-  return vec2:new(nx, ny)
+function vector:magsqr()
+  local m = 0
+  for i = 1, #self do
+    m = m + self[i] * self[i]
+  end
+  return m
 end
 
-function vec2:__add(other)
+function vector:__add(other)
+  local r = vector:new(#self)
   if type(other) == 'number' then
-    return vec2:new(self.x + other, self.y + other)
+    for i = 1, #self do
+      r[i] = self[i] + other
+    end
+  else
+    if #self ~= #other then error('Attempt to add unlike vectors.', 2) end
+    for i = 1, #self do
+      r[i] = self[i] + other[i]
+    end
   end
-  if type(self) == 'number' then
-    return vec2:new(self + other.x, self + other.y)
-  end
-  return vec2:new(self.x + other.x, self.y + other.y)
+  return r
 end
 
-function vec2:__sub(other)
+function vector:__sub(other)
+  local r = vector:new(#self)
   if type(other) == 'number' then
-    return vec2:new(self.x - other, self.y - other)
+    for i = 1, #self do
+      r[i] = self[i] - other
+    end
+  else
+    if #self ~= #other then error('Attempt to subtract unlike vectors.', 2) end
+    for i = 1, #self do
+      r[i] = self[i] - other[i]
+    end
   end
-  if type(self) == 'number' then
-    return vec2:new(self - other.x, self - other.y)
-  end
-  return vec2:new(self.x - other.x, self.y - other.y)
+  return r
 end
 
-function vec2:__mul(other)
+function vector:__mul(other)
+  local r = vector:new(#self)
   if type(other) == 'number' then
-    return vec2:new(self.x * other, self.y * other)
+    for i = 1, #self do
+      r[i] = self[i] * other
+    end
+  else
+    if #self ~= #other then error('Attempt to multiply unlike vectors.', 2) end
+    for i = 1, #self do
+      r[i] = self[i] * other[i]
+    end
   end
-  if type(self) == 'number' then
-    return vec2:new(self * other.x, self * other.y)
-  end
-  return vec2:new(self.x * other.x, self.y * other.y)
+  return r
 end
 
-function vec2:__div(other)
+function vector:__div(other)
+  local r = vector:new(#self)
   if type(other) == 'number' then
-    return vec2:new(self.x / other, self.y / other)
+    for i = 1, #self do
+      r[i] = self[i] / other
+    end
+  else
+    if #self ~= #other then error('Attempt to divide unlike vectors.', 2) end
+    for i = 1, #self do
+      r[i] = self[i] / other[i]
+    end
   end
-  if type(self) == 'number' then
-    return vec2:new(self / other.x, self / other.y)
-  end
-  return vec2:new(self.x / other.x, self.y / other.y)
+  return r
 end
 
-function vec2:__unm()
-  return vec2:new(-self.x, -self.y)
+function vector:__unm()
+  local r = vector:new(#self)
+  for i = 1, #self do
+    r[i] = -self[i]
+  end
+  return r
 end
 
-function vec2:norm()
+function vector:norm()
   return self / self:mag()
 end
 
-function vec2:__tostring()
-  return '(' .. tostring(self.x) .. ', ' .. tostring(self.y) .. ')'
+function vector:__tostring()
+  local s = '('
+  for i = 1, #self do
+    s = s .. tostring(self[i])
+    if i ~= #self then
+      s = s .. ', '
+    end
+  end
+  return s .. ')'
 end
 
-function vec2:draw(x, y, scale, arrow)
+function vector:__eq(other)
+  if #self ~= #other then return false end
+  for i= 1, #self do
+    if self[i] ~= other[i] then
+      return false
+    end
+  end
+  return true
+end
+
+-- 2D-only functions
+
+function vector:rotate(angle)
+  if #self ~= 2 then error('Rotation of non-2D vectors not implemented', 2) end
+  local cs, ns, nx, ny
+  cs, sn = math.cos(angle), math.sin(angle)
+  nx = self.x * cs - self.y * sn
+  ny = self.x * sn + self.y * cs
+  return vector:new{nx, ny}
+end
+
+function vector:draw(x, y, scale, arrow)
+  if #self ~= 2 then error('Drawing of non-2D vectors not implemented', 2) end
   if self:mag() ~= 0 then
     local t = self * scale
     if arrow > 0 then
@@ -144,5 +190,13 @@ function vec2:draw(x, y, scale, arrow)
   end
 end
 
-return vec2
+function vector:unpack()
+  local t = {}
+  for i = 1, #self do
+    t[i] = self[i]
+  end
+  return unpack(t)
+end
+
+return vector
 

@@ -77,7 +77,7 @@ logic.components = {
     init = function(self)
       local c
       for i = 1, 5 do
-        c = {0x55, 0x55, 0x55}
+        c = vector:new{0x55, 0x55, 0x55}
         c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0x88
         c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0x88
         self.output[i]:setColor(c)
@@ -96,6 +96,15 @@ logic.components = {
     end,
   },
 
+  Random = {
+    displayName = 'Random',
+    w = 2, h = 1,
+    color = colors.BasicSensor,
+    inputs = 0, outputs = 1,
+    update = function(self)
+      self.output[1]:setvoltage(love.math.random())
+    end,
+  },
 
   Truth = {
     displayName = 'True',
@@ -107,17 +116,50 @@ logic.components = {
       self.default = value:new{color = self.color}
     end,
     update = function(self)
-      local passthru = self.default
+      local node = self.default
       if self.input[1].link then
-        passthru = self.input[1].link.val
+        node = self.input[1].link.val
       end
-      self.output[1]:set(passthru)
+      self.color = node.color
+      self.output[1]:set(node)
       local voltage = self.output[1]:getvoltage()
       if voltage == 1.0 or voltage == -1.0 then
         self.output[1]:setvoltage(1.0)
       else
         self.output[1]:setvoltage(0.0)
       end
+    end,
+    draw = function(self, offx, offy, scale)
+      local drawx, drawy = self.x * scale + offx, self.y * scale + offy
+      local color = self.color or colors.Fallback
+      local darkColor = {color[1] / 3, color[2] / 3, color[3] / 3}
+      local mediumColor = {color[1] / 3 * 2, color[2] / 3 * 2, color[3] / 3 * 2}
+      local padding = scale / 32
+
+      love.graphics.setColor(darkColor)
+      love.graphics.setLineWidth(padding)
+      love.graphics.rectangle(
+        'fill', drawx + 2 * padding, drawy + 2 * padding,
+        self.w * scale - 4 * padding, self.h * scale - 4 * padding
+      )
+
+      love.graphics.setColor(mediumColor)
+      love.graphics.rectangle(
+        'line', drawx + 2 * padding, drawy + 2 * padding,
+        self.w * scale - 4 * padding, self.h * scale - 4 * padding
+      )
+
+      local node
+      if self.input[1].link then
+        node = self.input[1].link.val
+      else
+        node = self.default
+      end
+
+      logic.drawTruthSymbol(node,
+        drawx + self.w * scale / 2, drawy + self.h * scale / 2,
+        scale, self.w * 0.5, self.color
+      )
     end,
   },
 
@@ -181,6 +223,7 @@ logic.components = {
       self.output[1]:set(passthru)
     end,
   },
+  -- TODO: XOR
   NOT = {
     displayName = 'NOT',
     w = 1, h = 1,
@@ -237,11 +280,12 @@ logic.components = {
       self.default = value:new{color = self.color}
     end,
     update = function(self)
-      local passthru = self.default
+      local node = self.default
       if self.input[1].link then
-        passthru = self.input[1].link.val
+        node = self.input[1].link.val
       end
-      self.output[1]:set(passthru)
+      self.color = node.color
+      self.output[1]:set(node)
       local voltage = self.output[1]:getvoltage()
       self.output[1]:setvoltage(math.abs(voltage))
     end,
@@ -351,19 +395,57 @@ logic.components = {
       local passthru = self.default
       local val = 0
       local count = 0
+      local color
+      self.output[1]:set(self.default)
+      if #self.input == 0 then return end
       for _, input in ipairs(self.input) do
         if input.link then
           val = val + input.link.val:getvoltage()
+          color = input.link.val.color
         end
         count = count + 1
       end
       if count == 0 then
         self.output[1]:set(self.default)
       else
-        self.output[1]:setvoltage(val / count)
+        self.output[1]:set{
+          voltage = val / count,
+          color = color,
+        }
       end
     end,
   },
+
+  Add = {
+    displayName = 'Add',
+    w = 2, h = 2,
+    color = colors.BasicGate,
+    inputs = 2,
+    outputs = 1,
+    init = function(self)
+      self.default = value:new{color = self.color}
+    end,
+    update = function(self)
+      local passthru = self.default
+      local val = 0
+      local color = self.default.color
+      self.output[1]:set(self.default)
+      if #self.input == 0 then return end
+      for _, input in ipairs(self.input) do
+        if input.link then
+          val = val + input.link.val:getvoltage()
+          color = input.link.val.color
+        end
+      end
+      self.output[1]:set{
+        voltage = value.clamp(val),
+        color = color,
+      }
+    end,
+  },
+
+
+
   Negate = {
     displayName = 'Neg',
     w = 1, h = 1,
@@ -374,11 +456,12 @@ logic.components = {
       self.default = value:new{color = self.color}
     end,
     update = function(self)
-      local passthru = self.default
+      local node = self.default
       if self.input[1].link then
-        passthru = self.input[1].link.val
+        node = self.input[1].link.val
       end
-      self.output[1]:set(passthru)
+      self.color = node.color
+      self.output[1]:set(node)
       self.output[1]:setvoltage(-self.output[1]:getvoltage())
     end,
   },
@@ -437,20 +520,12 @@ logic.components = {
       end
 
       brightness = math.abs(node:getvoltage())
-      love.graphics.setColor({
-        node.color[1] * brightness,
-        node.color[2] * brightness,
-        node.color[3] * brightness,
-      })
-      love.graphics.circle(
-        'fill', drawx, drawy, radius
-      )
+      love.graphics.setColor(node.color * brightness)
+      love.graphics.circle('fill', drawx, drawy, radius)
 
       love.graphics.setColor(node.color)
       love.graphics.setLineWidth(scale / 32)
-      love.graphics.circle(
-        'line', drawx, drawy, radius
-      )
+      love.graphics.circle('line', drawx, drawy, radius)
 
       if SHOW_DEBUG_TEXT then
         love.graphics.setColor(node.color)
@@ -546,11 +621,7 @@ logic.components = {
       )
 
       local brightness = math.abs(node:getvoltage())
-      love.graphics.setColor({
-        node.color[1] * brightness,
-        node.color[2] * brightness,
-        node.color[3] * brightness,
-      })
+      love.graphics.setColor(node.color * brightness)
       love.graphics.circle('fill',
         drawx + (self.w * 3 / 4) * scale, drawy + (self.h / 4) * scale,
         self.h / 8 * scale
@@ -611,6 +682,7 @@ function logic:instance(name, x, y)
     draw = base.draw or self.draw,
     drawInputNodes = base.drawInputNodes or self.drawInputNodes,
     drawOutputNodes = base.drawOutputNodes or self.drawOutputNodes,
+    collider = collider:rect{-1, -1, 1, 1},
   }
 
   local inputNames, outputNames = base.inputNames or {}, base.outputNames or {}
@@ -620,9 +692,18 @@ function logic:instance(name, x, y)
       comp.input[i] = {
         name = inputNames[i] or '',
         default = value:new{color = comp.color},
-        --index = i,
-        --parent = comp,
+        collider = collider:rect{-1, -1, 1, 1},
+        index = i,
+        parent = comp,
         --link = nil,
+        pick = function(self, mouse)
+          if self.link then
+            local val = self.link.val
+            self.parent:unlinkInput(self.index)
+            return val
+          end
+        end,
+        class = 'input',
       }
     end
   --elseif base.inputs == 'var' then
@@ -637,6 +718,7 @@ function logic:instance(name, x, y)
         parent = comp,
         index = i,
         links = {},
+        collider = collider:rect{-1, -1, 1, 1},
       }
     end
   end
@@ -691,7 +773,7 @@ function logic:unlinkAllOutputs()
   for o, val in pairs(self.output) do
     for comp, links in pairs(val.links) do
       for comp_index, exists in pairs(links) do
-        print(o, comp, comp_index, exists, val)
+        --print(o, comp, comp_index, exists, val)
         self:unlinkOutput(o, comp, comp_index)
       end
     end
@@ -706,8 +788,8 @@ end
 function logic:draw(offx, offy, scale)
   local drawx, drawy = self.x * scale + offx, self.y * scale + offy
   local color = self.color or colors.Fallback
-  local darkColor = {color[1] / 3, color[2] / 3, color[3] / 3}
-  local mediumColor = {color[1] / 3 * 2, color[2] / 3 * 2, color[3] / 3 * 2}
+  local darkColor = color / 3
+  local mediumColor = darkColor * 2
   local padding = scale / 32
 
   love.graphics.setColor(darkColor)
@@ -724,7 +806,9 @@ function logic:draw(offx, offy, scale)
   )
 
   love.graphics.setColor(color)
-  love.graphics.print(self.name, drawx + 3 * padding, drawy + 3 * padding)
+  if scale >= 32 or SHOW_DEBUG_TEXT then
+    love.graphics.print(self.name, drawx + 3 * padding, drawy + 3 * padding)
+  end
 end
 
 function logic:drawInputNodes(offx, offy, scale, color)
@@ -827,8 +911,8 @@ function logic:drawWires(offx, offy, scale)
   for indexO, val in ipairs(self.output) do
     local v = val:getvoltage()
     local mag = math.abs(v)
-    local vColor = {val.color[1] * mag, val.color[2] * mag, val.color[3] * mag}
-    local halfColor = {val.color[1] / 2, val.color[2] / 2, val.color[3] / 2}
+    local vColor = val.color * mag
+    local halfColor = val.color / 2
     x1, y1 = self:outputCoords(indexO)
     x1, y1 = x1 * scale + offx, y1 * scale + offy
     if val.links then
@@ -845,6 +929,65 @@ function logic:drawWires(offx, offy, scale)
   end
 end
 
+function logic:drawDebug(offx, offy, scale)
+  if SHOW_DEBUG_TEXT then
+    love.graphics.setLineWidth(scale / 32)
+    love.graphics.setLineJoin('bevel')
+    self:drawColliders()
+  end
+end
+
+local function drawColliderColor(col)
+  if col.hit then
+    love.graphics.setColor(colors.BrightCyan)
+  else
+    love.graphics.setColor(colors.FullWhite)
+  end
+  col:draw()
+end
+
+function logic:drawColliders()
+  if self.collider then
+    drawColliderColor(self.collider)
+  end
+  for o, out in ipairs(self.output) do
+    if out.collider then
+      drawColliderColor(out.collider)
+    end
+  end
+  for i, inp in ipairs(self.input) do
+    if inp.collider then
+      drawColliderColor(inp.collider)
+    end
+  end
+end
+
+function logic:updateCollider(camera, board)
+  local x, y, w, h
+  local ioHalfWidth = 0.25
+  if self.collider.kind == 'rect' then
+    x, y, w, h = camera:project(
+      self.x * board.scale + board.x, self.y * board.scale + board.y,
+      self.w * board.scale, self.h * board.scale
+    )
+    self.collider:set{x, y, w, h}
+  else
+    error('logic:updateCollider() not yet implemented for collider type ' .. self.collider.kind)
+  end
+  for o, out in ipairs(self.output) do
+    x, y = self:outputCoords(o)
+    x, y = (x - ioHalfWidth) * board.scale + board.x, (y - ioHalfWidth) * board.scale + board.y
+    w, h = 2 * ioHalfWidth * board.scale, 2 * ioHalfWidth * board.scale
+    out.collider:set{camera:project(x, y, w, h)}
+  end
+  for i, inp in ipairs(self.input) do
+    x, y = self:inputCoords(i)
+    x, y = (x - ioHalfWidth) * board.scale + board.x, (y - ioHalfWidth) * board.scale + board.y
+    w, h = 2 * ioHalfWidth * board.scale, 2 * ioHalfWidth * board.scale
+    inp.collider:set{camera:project(x, y, w, h)}
+  end
+end
+
 function logic:inputCoords(i)
   return self.x, self.y + (i - 0.5) * self.h / #self.input
 end
@@ -856,16 +999,64 @@ end
 function logic.drawWire(offx, offy, scale, val, points)
   local v = val:getvoltage()
   local mag = math.abs(v)
-  local vColor = {val.color[1] * mag, val.color[2] * mag, val.color[3] * mag}
-  local halfColor = {val.color[1] / 2, val.color[2] / 2, val.color[3] / 2}
-  --local halfColor = {val.color[1], val.color[2], val.color[3], 0.75 * 255}
+  local vColor = val.color * mag
+  local halfColor = val.color / 2
+  --local quarterColor = val.color / 4
+  --local threeQuarterColor = quarterColor * 3
   love.graphics.setLineJoin('bevel')
   love.graphics.setColor(halfColor)
+  --[[
+  if mag >= 0.5 then
+    love.graphics.setColor(quarterColor)
+  else
+    love.graphics.setColor(threeQuarterColor)
+  end
+  --]]
   love.graphics.setLineWidth(scale / 4)
   love.graphics.line(points)
   love.graphics.setColor(vColor)
   love.graphics.setLineWidth(scale / 8)
   love.graphics.line(points)
+end
+
+function logic.drawTruthSymbol(node, x, y, scale, shapeWidth, color)
+  local voltage = node:getvoltage()
+  shapeWidth = scale * shapeWidth * 0.5
+  love.graphics.setLineWidth(scale / 16)
+  love.graphics.setColor(color)
+  if math.abs(voltage) == 1.0 then
+    love.graphics.rectangle('fill',
+      x - shapeWidth / 5,
+      y - shapeWidth,
+      shapeWidth / 5 * 2,
+      shapeWidth * 2
+    )
+    love.graphics.rectangle('fill',
+      x - shapeWidth,
+      y - shapeWidth,
+      shapeWidth * 2,
+      shapeWidth / 5 * 2
+    )
+  else
+    love.graphics.rectangle('fill',
+      x - shapeWidth,
+      y - shapeWidth,
+      shapeWidth / 5 * 2,
+      shapeWidth * 2
+    )
+    love.graphics.rectangle('fill',
+      x - shapeWidth,
+      y - shapeWidth,
+      shapeWidth * 2,
+      shapeWidth / 5 * 2
+    )
+    love.graphics.rectangle('fill',
+      x - shapeWidth,
+      y - shapeWidth / 5,
+      shapeWidth * 3 / 2,
+      shapeWidth / 5 * 2
+    )
+  end
 end
 
 function logic.drawSignSymbol(node, x, y, scale, shapeWidth, color)

@@ -17,7 +17,7 @@ function value:new(val)
     val = {}
   end
   val.voltage = value.clamp(val) or 0.0
-  val.color = val.color or colors.FullWhite
+  val.color = vector:new(val.color or colors.FullWhite)
   setmetatable(val, self)
   return val
 end
@@ -37,7 +37,7 @@ function value:getvoltage()
 end
 
 function value:setColor(c)
-  self.color = {c[1], c[2], c[3]}
+  self.color = vector:new(c)
 end
 
 --[[
@@ -58,7 +58,7 @@ function value:set(other)
     self.voltage = other.voltage
   end
   if other.color then
-    self.color = {other.color[1], other.color[2], other.color[3]}
+    self:setColor(other.color)
   end
 end
 
@@ -88,8 +88,8 @@ function value:drawIONode(nodeType, x, y, radius)
   local scale = radius / 32
   local v = self:getvoltage()
   local mag = math.abs(v)
-  local vColor = {self.color[1] * mag, self.color[2] * mag, self.color[3] * mag}
-  local halfColor = {self.color[1] / 2, self.color[2] / 2, self.color[3] / 2}
+  local vColor = self.color * mag
+  local halfColor = self.color / 2
   if nodeType == 'i' then
     love.graphics.setColor(self.color)
     love.graphics.polygon('fill',
@@ -97,7 +97,7 @@ function value:drawIONode(nodeType, x, y, radius)
       x + 1.5 * scale, y + 5 * scale,
       x - 3.5 * scale, y + 5 * scale,
       x - 0.5 * scale, y + 1.5 * scale,
-      -- FIXME: ??? profit? literally no idea why ^^this y co-ordinate^^ works. tempted to say it's a float rounding artifact
+      -- FIXME: ??? profit? literally no idea why ^^this y co-ordinate^^ works. I must be doing something awfully wrong somehow
       x - 3.5 * scale, y - 5 * scale
     )
   elseif nodeType == 'o' then
@@ -123,9 +123,22 @@ function value:drawIONode(nodeType, x, y, radius)
     love.graphics.circle('fill', x, y, 7 * scale)
     love.graphics.setColor(colors.Black)
     love.graphics.circle('fill', x, y, 5 * scale)
-    love.graphics.setColor(self.color)--(vColor)
+    love.graphics.setColor(self.color)--(vColor)--
     love.graphics.polygon('fill', x - 2 * scale, y - 3 * scale, x + 4 * scale, y, x - 2 * scale, y + 3 * scale)
   end
+end
+
+function value:link(other)
+  self.parent:link(self.index, other.parent, other.index)
+end
+
+function value:pick(mouse) return self end
+
+function value:place(mouse)
+  if mouse.hoveredObject and mouse.hoveredObject.class == 'input' then
+    self:link(mouse.hoveredObject)
+  end
+  return self
 end
 
 rawset(_G, '_ALLOWGLOBALS', true)
