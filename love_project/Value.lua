@@ -3,45 +3,46 @@ require('noglobals')
 
 rawset(_G, '_ALLOWGLOBALS', false)
 
-local value = {}
-value.__index = value
-value.class = 'value'
---setmetatable(value, value)
+local Value = {}
+Value.__index = Value
+Value.class = 'Value'
+--setmetatable(Value, Value)
 
-local colors = require('colors')
+local Color = require('Color')
+local Vector = require('Vector')
 
-function value:new(val)
+function Value:new(val)
   if type(val) == 'number' then
     val = {voltage = val}
   elseif not val then
     val = {}
   end
-  val.voltage = value.clamp(val) or 0.0
-  val.color = vector:new(val.color or colors.FullWhite)
+  val.voltage = Value.clamp(val) or 0.0
+  val.color = Vector:new(val.color or Color.FullWhite)
   setmetatable(val, self)
   return val
 end
 
-function value:setvoltage(v)
+function Value:setvoltage(v)
   -- DEBUG
   if v > 1.0 or v < -1.0 then
-    error('E: attempt to set value outside range')
-    --print('W: attempt to set value outside range ' .. tostring(v))
+    error('E: attempt to set Value outside range')
+    --print('W: attempt to set Value outside range ' .. tostring(v))
     --v = self.clamp(v)
   end
   self.voltage = v
 end
 
-function value:getvoltage()
+function Value:getvoltage()
   return self.voltage
 end
 
-function value:setColor(c)
-  self.color = vector:new(c)
+function Value:setColor(c)
+  self.color = Vector:new(c)
 end
 
 --[[
-function value:dup(val)
+function Value:dup(val)
   val = val or {}
   if not getmetatable(val) then
     setmetatable(val, getmetatable(self))
@@ -50,8 +51,8 @@ function value:dup(val)
   return val
 end--]]
 
-function value:set(other)
-  if not other then error('Required argument "other" to value:set', 2) end
+function Value:set(other)
+  if not other then error('Required argument "other" to Value:set', 2) end
   if other.getvoltage then
     self.voltage = other:getvoltage()
   elseif other.voltage then
@@ -62,7 +63,7 @@ function value:set(other)
   end
 end
 
-function value:clamp()
+function Value:clamp()
   if type(self) == 'table' and self.voltage then
     if self.voltage < -1.0 then
       self.voltage = -1.0
@@ -80,11 +81,11 @@ function value:clamp()
   end
 end
 
-function value:__tostring()
+function Value:__tostring()
   return ("%.f%%"):format(self.voltage * 100)
 end
 
-function value:drawIONode(nodeType, x, y, radius)
+function Value:drawIONode(nodeType, x, y, radius)
   local scale = radius / 32
   local v = self:getvoltage()
   local mag = math.abs(v)
@@ -118,24 +119,24 @@ function value:drawIONode(nodeType, x, y, radius)
     )
     --]]
   else
-    if nodeType ~= 'arrow' then print('value:drawIONode() falling back to node type "arrow"') end
+    if nodeType ~= 'arrow' then print('Value:drawIONode() falling back to node type "arrow"') end
     love.graphics.setColor(self.color)
     love.graphics.circle('fill', x, y, 7 * scale)
-    love.graphics.setColor(colors.Black)
+    love.graphics.setColor(Color.Black)
     love.graphics.circle('fill', x, y, 5 * scale)
     love.graphics.setColor(self.color)--(vColor)--
     love.graphics.polygon('fill', x - 2 * scale, y - 3 * scale, x + 4 * scale, y, x - 2 * scale, y + 3 * scale)
   end
 end
 
-function value:link(other)
+function Value:link(other)
   self.parent:link(self.index, other.parent, other.index)
 end
 
-function value:pick(mouse) return self end
+function Value:pick(mouse) return self end
 
-function value:place(mouse)
-  if mouse.hoveredObject and mouse.hoveredObject.class == 'input' then
+function Value:place(mouse)
+  if mouse.hoveredObject and mouse.hoveredObject.class == 'Input' then
     self:link(mouse.hoveredObject)
   end
   return self
@@ -143,4 +144,4 @@ end
 
 rawset(_G, '_ALLOWGLOBALS', true)
 
-return value
+return Value

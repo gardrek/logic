@@ -15,6 +15,8 @@ end
 mt.__newindex = function(self, key, value)
   if _ALLOWGLOBALS then
     rawset(self, key, value)
+  elseif key == '_' then
+    rawset(self, key, value)
   else
     error('No Globals is in effect', 2)
   end

@@ -1,30 +1,30 @@
-vector = require('vector')
+Vector = require('Vector')
 
-local collider = {}
-collider.__index = collider
+local Collider = {}
+Collider.__index = Collider
 
-collider.kinds = {
+Collider.kinds = {
   'point',
   'rect',
   'circ',
 }
 
-collider.overlapFunctions = {}
+Collider.overlapFunctions = {}
 
-collider.drawFunctions = {}
+Collider.drawFunctions = {}
 
-for _, kind in ipairs(collider.kinds) do
-  collider[kind] = function(self, data)
+for _, kind in ipairs(Collider.kinds) do
+  Collider[kind] = function(self, data)
     return self:new(kind, data)
   end
-  collider.overlapFunctions[kind] = {}
+  Collider.overlapFunctions[kind] = {}
 end
 
-collider.overlapFunctions.point.point = function(self, other)
+Collider.overlapFunctions.point.point = function(self, other)
   return other.center.x == self.center.x and other.center.y == self.center.y
 end
 
-collider.overlapFunctions.point.rect = function(self, other)
+Collider.overlapFunctions.point.rect = function(self, other)
   return
     self.center.x >= other.corner.x and
     self.center.y >= other.corner.y and
@@ -32,12 +32,12 @@ collider.overlapFunctions.point.rect = function(self, other)
     self.center.y < other.corner.y + other.dim.y
 end
 
-collider.overlapFunctions.point.circ = function(self, other)
+Collider.overlapFunctions.point.circ = function(self, other)
   local distX, distY = other.center.x - self.center.x, other.center.y - self.center.y
   return distX * distX + distY * distY < other.radius * other.radius
 end
 
-collider.overlapFunctions.rect.rect = function(self, other)
+Collider.overlapFunctions.rect.rect = function(self, other)
   return
     self.corner.x + self.dim.x >= other.corner.x and
     self.center.y + self.dim.y >= other.corner.y and
@@ -45,40 +45,40 @@ collider.overlapFunctions.rect.rect = function(self, other)
     self.center.y < other.corner.y + other.dim.y
 end
 
-collider.overlapFunctions.rect.circ = function(self, other)
+Collider.overlapFunctions.rect.circ = function(self, other)
   --error('circ-rect collision not yet implemented', 2)
   --local distX, distY = other.point.x - self.point.x, other.point.y - self.point.y
   --return math.sqrt(distX * distX + distY * distY) < other.radius
 end
 
-collider.overlapFunctions.circ.circ = function(self, other)
+Collider.overlapFunctions.circ.circ = function(self, other)
   local distX, distY = other.center.x - self.center.x, other.center.y - self.center.y
   return distX * distX + distY * distY < other.radius * other.radius + self.radius * self.radius
 end
 
-collider.overlapFunctions.rect.point = function(self, other)
-  return collider.overlapFunctions.point.rect(other, self)
+Collider.overlapFunctions.rect.point = function(self, other)
+  return Collider.overlapFunctions.point.rect(other, self)
 end
 
-collider.overlapFunctions.circ.point = function(self, other)
-  return collider.overlapFunctions.point.circ(other, self)
+Collider.overlapFunctions.circ.point = function(self, other)
+  return Collider.overlapFunctions.point.circ(other, self)
 end
 
-collider.overlapFunctions.circ.rect = function(self, other)
-  return collider.overlapFunctions.rect.circ(other, self)
+Collider.overlapFunctions.circ.rect = function(self, other)
+  return Collider.overlapFunctions.rect.circ(other, self)
 end
 
-function collider:new(kind, data)
-  return setmetatable({kind = tostring(kind)}, collider):set(data)
+function Collider:new(kind, data)
+  return setmetatable({kind = tostring(kind)}, Collider):set(data)
 end
 
-function collider:set(data)
+function Collider:set(data)
   if self.kind == 'point' then
     assert(
       type(data[1]) == 'number' and
       type(data[2]) == 'number'
     )
-    self.center = vector:new{data[1], data[2]}
+    self.center = Vector:new{data[1], data[2]}
   elseif self.kind == 'rect' then
     assert(
       type(data[1]) == 'number' and
@@ -86,24 +86,24 @@ function collider:set(data)
       type(data[3]) == 'number' and
       type(data[4]) == 'number'
     )
-    self.corner = vector:new{data[1], data[2]}
-    self.dim = vector:new{data[3], data[4]}
+    self.corner = Vector:new{data[1], data[2]}
+    self.dim = Vector:new{data[3], data[4]}
   elseif self.kind == 'circ' then
     assert(
       type(data[1]) == 'number' and
       type(data[2]) == 'number' and
       type(data[3]) == 'number'
     )
-    self.center = vector:new{data[1], data[2]}
+    self.center = Vector:new{data[1], data[2]}
     self.radius = data[3]
   else
-    error('collider:new() unrecognized collider type "' .. self.kind .. '"', 2)
+    error('Collider:new() unrecognized Collider type "' .. self.kind .. '"', 2)
   end
   return self
 end
 
-function collider:overlaps(other, callback)
-  local hit = collider.overlapFunctions[self.kind][other.kind](self, other)
+function Collider:overlaps(other, callback)
+  local hit = Collider.overlapFunctions[self.kind][other.kind](self, other)
   local selfHit, otherHit = callback(hit)
   -- this way you can set and clear using bool, and nil causes no change
   -- of course, you can actually use any value here
@@ -116,22 +116,22 @@ function collider:overlaps(other, callback)
   return hit
 end
 
-collider.collide = collider.overlaps
+Collider.collide = Collider.overlaps
 
-function collider:draw(offsetX, offsetY, scale)
+function Collider:draw(offsetX, offsetY, scale)
   offsetX = offsetX or 0
   offsetY = offsetY or 0
   scale = scale or 1
-  return collider.drawFunctions[self.kind](self, offsetX, offsetY, scale)
+  return Collider.drawFunctions[self.kind](self, offsetX, offsetY, scale)
 end
 
-collider.drawFunctions.point = function(self, offsetX, offsetY, scale)
+Collider.drawFunctions.point = function(self, offsetX, offsetY, scale)
   local len = 5 * scale
   love.graphics.line(self.center.x - len, self.center.y, self.center.x + len, self.center.y)
   love.graphics.line(self.center.x, self.center.y - len, self.center.x, self.center.y + len)
 end
 
-collider.drawFunctions.rect = function(self, offsetX, offsetY, scale)
+Collider.drawFunctions.rect = function(self, offsetX, offsetY, scale)
   love.graphics.rectangle('line',
     self.corner.x * scale + offsetX,
     self.corner.y * scale + offsetY,
@@ -140,7 +140,7 @@ collider.drawFunctions.rect = function(self, offsetX, offsetY, scale)
   )
 end
 
-collider.drawFunctions.circ = function(self, offsetX, offsetY, scale)
+Collider.drawFunctions.circ = function(self, offsetX, offsetY, scale)
   love.graphics.circle('line',
     self.center.x * scale + offsetX,
     self.center.y * scale + offsetY,
@@ -148,4 +148,4 @@ collider.drawFunctions.circ = function(self, offsetX, offsetY, scale)
   )
 end
 
-return collider
+return Collider
