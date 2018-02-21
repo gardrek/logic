@@ -157,6 +157,7 @@ function love.load()
     mainboard:insertNew('Colorize', offx, yi * 2 - 1)
   end
   --]]
+  --for name in pairs(Logic.components) do print(name) end
 end
 
 function love.draw()

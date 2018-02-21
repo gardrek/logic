@@ -1,6 +1,6 @@
 -- Generic Vector class, with any number of elements
 local Vector = {}
-setmetatable(Vector, Vector)
+--setmetatable(Vector, Vector)
 Vector.class = 'Vector'
 
 Vector.name = {
@@ -29,7 +29,8 @@ function Vector:new(t)
     error('Bad argument to Vector:new() of type ' .. type(t), 2)
   end
   obj = Vector.dup(t)
-  setmetatable(obj, getmetatable(self))
+  --setmetatable(obj, getmetatable(self))
+  setmetatable(obj, Vector)
   return obj
 end
 
@@ -200,4 +201,3 @@ function Vector:unpack()
 end
 
 return Vector
-
