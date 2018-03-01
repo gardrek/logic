@@ -129,19 +129,4 @@ function Value:drawIONode(nodeType, x, y, radius)
   end
 end
 
-function Value:link(other)
-  self.parent:link(self.index, other.parent, other.index)
-end
-
-function Value:pick(mouse) return self end
-
-function Value:place(mouse)
-  if mouse.hoveredObject and mouse.hoveredObject.class == 'Input' then
-    self:link(mouse.hoveredObject)
-  end
-  return self
-end
-
-rawset(_G, '_ALLOWGLOBALS', true)
-
 return Value

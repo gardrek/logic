@@ -1,7 +1,8 @@
-Vector = require('Vector')
+local Vector = require('Vector')
 
 local Collider = {}
 Collider.__index = Collider
+Collider.class = 'Collider'
 
 Collider.kinds = {
   'point',
@@ -39,10 +40,10 @@ end
 
 Collider.overlapFunctions.rect.rect = function(self, other)
   return
-    self.corner.x + self.dim.x >= other.corner.x and
-    self.center.y + self.dim.y >= other.corner.y and
-    self.center.x < other.corner.x + other.dim.x and
-    self.center.y < other.corner.y + other.dim.y
+    self.corner.x + self.dim.x > other.corner.x and
+    self.corner.y + self.dim.y > other.corner.y and
+    self.corner.x < other.corner.x + other.dim.x and
+    self.corner.y < other.corner.y + other.dim.y
 end
 
 Collider.overlapFunctions.rect.circ = function(self, other)
@@ -104,7 +105,10 @@ end
 
 function Collider:overlaps(other, callback)
   local hit = Collider.overlapFunctions[self.kind][other.kind](self, other)
-  local selfHit, otherHit = callback(hit)
+  local selfHit, otherHit
+  if callback then
+    selfHit, otherHit = callback(hit)
+  end
   -- this way you can set and clear using bool, and nil causes no change
   -- of course, you can actually use any value here
   if selfHit ~= nil then

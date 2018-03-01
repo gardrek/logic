@@ -23,48 +23,22 @@ input_node
 -- This library stops you from (accidentally) creating globals
 require('noglobals')
 
+rawset(_G, '_ALLOWGLOBALS', false)
+
+local Logic = {}
+Logic.__index = Logic
+Logic.class = 'Component'
+
 local Color = require('Color')
 
 local Collider = require('Collider')
 
 local Value = require('Value')
 
-local Logic = {}
-Logic.__index = Logic
-Logic.class = 'Component'
-
 function Value:Coords()
   if not self.parent then error('Value has no parent.') end
+  --return self.parent.x + self.parent.w, self.parent.y + self.index - 0.5
   return self.parent:outputCoords(self.index)
-end
-
-function Value:link(other)
-  self.parent:link(self.index, other.parent, other.index)
-end
-
-function Value:pick(mouse) return self end
-
-function Value:place(mouse)
-  if mouse.hoveredObject then
-    if mouse.hoveredObject.class == 'Input' then
-      self:link(mouse.hoveredObject)
-    elseif mouse.hoveredObject.class == 'Board' then
-      local comp = Logic:instance('PassThru', mouse:reverseProject())
-      self:link(comp.input[1])
-      local oldPlace = comp.place
-      comp.place = function(self, mouse)
-        local obj = oldPlace(self, mouse)
-        if obj then
-          return obj
-        else
-          self.place = nil
-          return self.output[1]
-        end
-      end
-      return comp
-    end
-  end
-  return self
 end
 
 Logic.components = {
@@ -73,7 +47,7 @@ Logic.components = {
     w = 2, h = 6,
     color = Color.BasicSensor,
     inputs = 0, outputs = 6,
-    outputNames = {'joyX', 'joyY', 'a', 'b', 'c', 'start'},
+    outputNames = {'x', 'y', 'a', 'b', 'c', 'start'},
     update = function(self)
       local keyNames = {false, false, 'z', 'x', 'c', 'return'}
       for index, name in ipairs(keyNames) do
@@ -158,11 +132,7 @@ Logic.components = {
         self.output[1]:setvoltage(0.0)
       end
     end,
-    ---[[
-    --Truth
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
+    draw = function(self, drawx, drawy, scale)
       local color = self.color or Color.Fallback
       local darkColor = {color[1] / 3, color[2] / 3, color[3] / 3}
       local mediumColor = {color[1] / 3 * 2, color[2] / 3 * 2, color[3] / 3 * 2}
@@ -192,7 +162,7 @@ Logic.components = {
         drawx + self.w * scale / 2, drawy + self.h * scale / 2,
         scale, self.w * 0.5, self.color
       )
-    end,--]]
+    end,
   },
 
   AND = {
@@ -225,7 +195,6 @@ Logic.components = {
       self.output[1]:set(passthru)
     end,
   },
-
   OR = {
     displayName = 'OR',
     w = 2, h = 2,
@@ -256,9 +225,7 @@ Logic.components = {
       self.output[1]:set(passthru)
     end,
   },
-
   -- TODO: XOR
-
   NOT = {
     displayName = 'NOT',
     w = 1, h = 1,
@@ -278,10 +245,7 @@ Logic.components = {
       local voltage = self.output[1]:getvoltage()
       self.output[1]:setvoltage((voltage < 0.0 and -1.0 or 1.0) - voltage)
     end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
+    draw = function(self, drawx, drawy, scale)
       local color = self.color or Color.Fallback
       local darkColor = {color[1] / 3, color[2] / 3, color[3] / 3}
       local padding = scale / 32
@@ -304,7 +268,7 @@ Logic.components = {
 
       love.graphics.setColor(self.color)
       love.graphics.circle('line', drawx + self.w * scale - 6 * padding, drawy + self.h * scale / 2, padding * 5)
-    end,--]]
+    end
   },
 
   ABS = {
@@ -352,10 +316,7 @@ Logic.components = {
         self.output[1]:setvoltage(0.0)
       end
     end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
+    draw = function(self, drawx, drawy, scale)
       local color = self.color or Color.Fallback
       local darkColor = {color[1] / 3, color[2] / 3, color[3] / 3}
       local mediumColor = {color[1] / 3 * 2, color[2] / 3 * 2, color[3] / 3 * 2}
@@ -385,7 +346,7 @@ Logic.components = {
         drawx + self.w * scale / 2, drawy + self.h * scale / 2,
         scale, self.w * 0.5, self.color
       )
-    end,--]]
+    end
   },
 
   PassThru = {
@@ -410,22 +371,19 @@ Logic.components = {
     end,
     --drawOutputNodes = function() end,
     --drawInputNodes = function() end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
+    draw = function(self, offx, offy, scale)
       self.visual:set(self.output[1])
       self.visual:setvoltage(1.0)
       self.visual:drawIONode('arrow',
-        drawx + (self.w / 2) * scale,
-        drawy + (self.h / 2) * scale,
+        offx + (self.w / 2) * scale,
+        offy + (self.h / 2) * scale,
         scale * self.w * 2.25
       )
-    end,--]]
+    end,
   },
 
   Colorize = {
-    displayName = 'Dye',
+    displayName = 'col',
     w = 1, h = 1,
     color = Color.BasicGate,
     inputs = 1,
@@ -445,6 +403,18 @@ Logic.components = {
       self.output[1]:set(node)
       self.output[1]:setColor(self.color)
     end,
+    --drawOutputNodes = function() end,
+    --drawInputNodes = function() end,
+    --[[
+    draw = function(self, offx, offy, scale)
+      self.visual:set(self.output[1])
+      self.visual:setvoltage(1.0)
+      self.visual:drawIONode('arrow',
+        offx + (self.x + self.w / 2) * scale,
+        offy + (self.y + self.h / 2) * scale,
+        scale * self.w * 2.25
+      )
+    end,--]]
   },
 
   AVG = {
@@ -528,7 +498,6 @@ Logic.components = {
       self.output[1]:setvoltage(-self.output[1]:getvoltage())
     end,
   },
-
   SignSplit = {
     displayName = 'SignSplit',
     w = 2, h = 2,
@@ -572,10 +541,7 @@ Logic.components = {
       end
       self.color = --[[self.colorOverride or ]]node.color
     end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
+    draw = function(self, drawx, drawy, scale)
       local radius = self.w * scale / 2
       local drawx, drawy = drawx + radius, drawy + radius
       local brightness = 0
@@ -598,7 +564,7 @@ Logic.components = {
         love.graphics.setColor(node.color)
         love.graphics.print(tostring(node), drawx, drawy + radius)
       end
-    end,--]]
+    end,
   },
 
   ProgBar = {
@@ -615,10 +581,7 @@ Logic.components = {
       end
       self.color = node.color
     end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
+    draw = function(self, drawx, drawy, scale)
       local node
       if self.input[1] and self.input[1].link then
         node = self.input[1].link.comp.output[self.input[1].link.index]
@@ -645,7 +608,7 @@ Logic.components = {
         (self.w * scale - 10 * padding) * math.abs(length),
         self.h * scale - 10 * padding
       )
-    end,--]]
+    end,
   },
 
   Multimeter = {
@@ -662,10 +625,7 @@ Logic.components = {
       end
       self.color = node.color
     end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
+    draw = function(self, drawx, drawy, scale)
       local node
       if self.input[1] and self.input[1].link then
         node = self.input[1].link.comp.output[self.input[1].link.index]
@@ -733,7 +693,7 @@ Logic.components = {
           )
         end
       end
-    end,--]]
+    end,
   },
 }
 
@@ -750,14 +710,11 @@ function Logic:instance(name, x, y)
     output = {},
     init = base.init,
     update = base.update or self.update,
-    draw = base.draw or self.draw, -- FIXME: maybe?
-    scale = base.scale or 32,
-    mouseCollider = Collider:rect{-1, -1, 1, 1},
+    draw = base.draw or self.draw,
+    drawInputNodes = base.drawInputNodes or self.drawInputNodes,
+    drawOutputNodes = base.drawOutputNodes or self.drawOutputNodes,
+    collider = Collider:rect{-1, -1, 1, 1},
   }
-
-  setmetatable(comp, self)
-
-  comp:updateWorldCollider()
 
   local inputNames, outputNames = base.inputNames or {}, base.outputNames or {}
 
@@ -766,7 +723,7 @@ function Logic:instance(name, x, y)
       comp.input[i] = {
         name = inputNames[i] or '',
         default = Value:new{color = comp.color},
-        mouseCollider = Collider:rect{-1, -1, 1, 1},
+        collider = Collider:rect{-1, -1, 1, 1},
         index = i,
         parent = comp,
         --link = nil,
@@ -792,70 +749,14 @@ function Logic:instance(name, x, y)
         parent = comp,
         index = i,
         links = {},
-        mouseCollider = Collider:rect{-1, -1, 1, 1},
+        collider = Collider:rect{-1, -1, 1, 1},
       }
     end
   end
 
   if comp.init then comp:init() end
 
-  return comp
-end
-
-function Logic:dup()
-  local base = self
-  if not base then error('Component ' .. tostring(name) .. ' does not exist.', 2) end
-  local comp = {
-    base = base.base,
-    name = base.name,
-    x = base.x, y = base.y,
-    w = base.w or 21, h = base.h or 21,
-    color = base.color,
-    input = {},
-    output = {},
-    init = base.init,
-    update = base.update,
-    draw = base.draw or self.draw, -- FIXME: maybe?
-    scale = base.scale or 32,
-    mouseCollider = Collider:rect{-1, -1, 1, 1},
-  }
-
-  setmetatable(comp, Logic)
-
-  comp:updateWorldCollider()
-
-  for i = 1, #base.input do
-    comp.input[i] = {
-      name = base.input[i].name,
-      default = Value:new{color = comp.color},
-      mouseCollider = Collider:rect{-1, -1, 1, 1},
-      index = i,
-      parent = comp,
-      --link = nil,
-      pick = function(self, mouse)
-        if self.link then
-          local val = self.link.val
-          self.parent:unlinkInput(self.index)
-          return val
-        end
-      end,
-      class = 'Input',
-    }
-  end
-
-  for i = 1, #base.output do
-    comp.output[i] = Value:new{
-      name = base.output[i].name,
-      color = comp.color, --FIXME: inherit the individual i/o node's color?
-      parent = comp,
-      index = i,
-      links = {},
-      mouseCollider = Collider:rect{-1, -1, 1, 1},
-    }
-  end
-
-  if comp.init then comp:init() end
-
+  setmetatable(comp, self)
   return comp
 end
 
@@ -915,21 +816,20 @@ function Logic:unlinkAll()
   self:unlinkAllOutputs()
 end
 
-function Logic:drawAll(cam)
-  for _, func in ipairs{
-    'draw',
-    'drawOutputNodes',
-    'drawInputNodes',
-    'drawWires',
-    'drawDebug',
-  } do
-    self[func](self, cam)
+--FIXME: DELETEME: delete it or use it
+function Logic:getCoords(x, y)
+  if x and y then
+    return x, y
+  elseif self.board then
+    return
+      self.x * self.board.scale + self.board.x,
+      self.y * self.board.scale + self.board.y
+  else
+    return 0, 0
   end
 end
 
-function Logic:draw(cam)
-  local drawx, drawy = cam:project(self.x, self.y)
-  local scale = self.scale * cam.zoom
+function Logic:draw(drawx, drawy, scale)
   local color = self.color or Color.Fallback
   local darkColor = color / 3
   local mediumColor = darkColor * 2
@@ -956,14 +856,12 @@ function Logic:draw(cam)
   end
 end
 
-function Logic:drawInputNodes(cam)
-  local drawx, drawy = cam:project(self.x, self.y)
-  local scale = self.scale * cam.zoom
-  local color = self.color or Color.Fallback
+function Logic:drawInputNodes(offx, offy, scale, color)
+  color = self.color or Color.Fallback
   local x, y, node
   for index, val in ipairs(self.input) do
     x, y = self:inputCoords(index)
-    x, y = x * scale + drawx, y * scale + drawy
+    x, y = x * scale + offx, y * scale + offy
     if val.link then
       node = val.link.comp.output[val.link.index]
     else
@@ -980,15 +878,14 @@ function Logic:drawInputNodes(cam)
   end
 end
 
-function Logic:drawOutputNodes(cam)
-  local drawx, drawy = cam:project(self.x, self.y)
-  local scale = self.scale * cam.zoom
-  local color = self.color or Color.Fallback
+function Logic:drawOutputNodes(offx, offy, scale, color)
+  color = self.color or Color.Fallback
   local x, y, node
   for index, val in ipairs(self.output) do
     love.graphics.setColor(val.color or color)
+    --x, y = (self.x + self.w) * scale + offx, (self.y + index - 0.5) * scale + offy
     x, y = self:outputCoords(index)
-    x, y = x * scale + drawx, y * scale + drawy
+    x, y = x * scale + offx, y * scale + offy
     if SHOW_DEBUG_TEXT then
       love.graphics.print(tostring(val.name), x - (self.w / 2) * scale, y - 12)
       love.graphics.print(tostring(val), x - (self.w / 2) * scale, y + 6)
@@ -1017,16 +914,25 @@ function Logic:drawHangingWire(offx, offy, scale, val, x1, y1, x2, y2)
   local points
   local curvesize = 0.25 * scale
   if x2 - curvesize < x1 then
-    local sign = 1
-    if y2 < y1 then sign = -1 end
-    points = {
-      x1, y1,
-      x1 + curvesize, y1,
-      x1 + curvesize, y1 + sign * curvesize,
-      x2 - curvesize, y2 - sign * curvesize,
-      x2 - curvesize, y2,
-      x2, y2,
-    }
+    if y2 < y1 then
+      points = {
+        x1, y1,
+        x1 + curvesize, y1,
+        x1 + curvesize, y1 - curvesize,
+        x2 - curvesize, y2 + curvesize,
+        x2 - curvesize, y2,
+        x2, y2,
+      }
+    else
+      points = {
+        x1, y1,
+        x1 + curvesize, y1,
+        x1 + curvesize, y1 + curvesize,
+        x2 - curvesize, y2 - curvesize,
+        x2 - curvesize, y2,
+        x2, y2,
+      }
+    end
   elseif x2 - curvesize > x1 + curvesize or (y2 < y1 - curvesize or y2 > y1 + curvesize) then
     points = {
       x1, y1,
@@ -1043,32 +949,98 @@ function Logic:drawHangingWire(offx, offy, scale, val, x1, y1, x2, y2)
   Logic.drawWire(offx, offy, scale, val, points)
 end
 
-function Logic:drawWires(cam)
-  local selfDrawX, selfDrawY = cam:project(self.x, self.y)
-  local otherDrawX, otherDrawY
-  local x1, y1, x2, y2
-  local scale = self.scale * cam.zoom
+function Logic:drawWiresCamera(cam)
+  local x1, y1, x2, y2, scale
+  if self.board then
+    scale = self.board.scale * camera.zoom
+    for indexO, val in ipairs(self.output) do
+      x1, y1 = self:outputCoords(indexO)
+      x1, y1 = cam:project(
+        (self.x + x1) * self.board.scale + self.board.x,
+        (self.y + y1) * self.board.scale + self.board.y
+      )
+      for comp, link in pairs(val.links) do
+        for indexI, haslink in pairs(link) do
+          if self.board == comp.board then
+            x2, y2 = comp:inputCoords(indexI)
+            x2, y2 = cam:project(
+              (comp.x + x2) * comp.board.scale + comp.board.x,
+              (comp.y + y2) * comp.board.scale + comp.board.y
+            )
+            Logic:drawHangingWire(0, 0, scale, val, x1, y1, x2, y2)
+            val:drawIONode('o', x1, y1, scale)
+            val:drawIONode('i', x2, y2, scale)
+          else
+            x2, y2 = comp:inputCoords(indexI)
+            x2, y2 = cam:project(
+              (comp.x + x2 * scale),
+              (comp.y + y2 * scale)
+            )
+            Logic:drawHangingWire(0, 0, scale, val, x1, y1, x2, y2)
+            val:drawIONode('o', x1, y1, scale)
+            val:drawIONode('i', x2, y2, scale)
+          end
+        end
+      end
+    end
+  else
+    error('Logic:drawWiresCamera() called on floating component (component not on a board)', 2)
+  end
+  --[[
   for indexO, val in ipairs(self.output) do
     local v = val:getvoltage()
     local mag = math.abs(v)
     local vColor = val.color * mag
     local halfColor = val.color / 2
     x1, y1 = self:outputCoords(indexO)
-    x1, y1 = x1 * scale + selfDrawX, y1 * scale + selfDrawY
+    x1, y1 = x1 * scale + offx, y1 * scale + offy
     if val.links then
       for comp, link in pairs(val.links) do
         for indexI, hasLink in pairs(link) do
-          --if self.board and self.board == comp.board then
-            otherDrawX, otherDrawY = cam:project(comp.x, comp.y)
+          if self.board and self.board == comp.board then
             x2, y2 = comp:inputCoords(indexI)
-            x2, y2 = x2 * scale + otherDrawX, y2 * scale + otherDrawY
-            Logic:drawHangingWire(0, 0, scale, val, x1, y1, x2, y2)
+            x2, y2 = x2 * scale + offx, y2 * scale + offy
+            Logic:drawHangingWire(offx, offy, scale, val, x1, y1, x2, y2)
             val:drawIONode('o', x1, y1, scale)
             val:drawIONode('i', x2, y2, scale)
-          --end
+          end
         end
       end
     end
+  end
+  --]]
+end
+
+function Logic:drawWires(offx, offy, scale)
+  local x1, y1, x2, y2
+  for indexO, val in ipairs(self.output) do
+    local v = val:getvoltage()
+    local mag = math.abs(v)
+    local vColor = val.color * mag
+    local halfColor = val.color / 2
+    x1, y1 = self:outputCoords(indexO)
+    x1, y1 = x1 * scale + offx, y1 * scale + offy
+    if val.links then
+      for comp, link in pairs(val.links) do
+        for indexI, hasLink in pairs(link) do
+          if self.board and self.board == comp.board then
+            x2, y2 = comp:inputCoords(indexI)
+            x2, y2 = x2 * scale + offx, y2 * scale + offy
+            Logic:drawHangingWire(offx, offy, scale, val, x1, y1, x2, y2)
+            val:drawIONode('o', x1, y1, scale)
+            val:drawIONode('i', x2, y2, scale)
+          end
+        end
+      end
+    end
+  end
+end
+
+function Logic:drawDebug(offx, offy, scale)
+  if SHOW_COLLIDERS then
+    love.graphics.setLineWidth(scale / 32)
+    love.graphics.setLineJoin('miter')
+    self:drawColliders()
   end
 end
 
@@ -1081,42 +1053,24 @@ local function drawColliderColor(col)
   col:draw()
 end
 
-function Logic:drawDebug(cam)
-  --local drawx, drawy = cam:project(self.x, self.y)
-  local scale = self.scale * cam.zoom
-  love.graphics.setLineWidth(scale / 32)
-  love.graphics.setLineJoin('miter')
-  if SHOW_COLLIDERS then
-    self:drawColliders()
---[[
-  else
-    love.graphics.setColor(Color.FullWhite)
-    local x, y = cam:project(0,0)
-    self.worldCollider:draw(x, y, cam.zoom)
---]]
-  end
-end
-
 function Logic:drawColliders()
-  if self.mouseCollider then
-    drawColliderColor(self.mouseCollider)
+  if self.collider then
+    drawColliderColor(self.collider)
   end
   for o, out in ipairs(self.output) do
-    if out.mouseCollider then
-      drawColliderColor(out.mouseCollider)
+    if out.collider then
+      drawColliderColor(out.collider)
     end
   end
   for i, inp in ipairs(self.input) do
-    if inp.mouseCollider then
-      drawColliderColor(inp.mouseCollider)
+    if inp.collider then
+      drawColliderColor(inp.collider)
     end
   end
 end
 
-function Logic:updateMouseColliders(cam)
-  local drawx, drawy = cam:project(self.x, self.y)
-  local scale = self.scale * cam.zoom
-  self.mouseCollider:set{drawx, drawy, self.w * scale, self.h * scale}
+function Logic:updateMouseColliders(drawx, drawy, scale)
+  self.collider:set{drawx, drawy, self.w * scale, self.h * scale}
 
   local ioHalfWidth = 0.25
   local x, y
@@ -1124,25 +1078,13 @@ function Logic:updateMouseColliders(cam)
   for o, out in ipairs(self.output) do
     x, y = self:outputCoords(o)
     x, y = drawx + (x - ioHalfWidth) * scale, drawy + (y - ioHalfWidth) * scale
-    out.mouseCollider:set{x, y, 2 * ioHalfWidth * scale, 2 * ioHalfWidth * scale}
+    out.collider:set{x, y, 2 * ioHalfWidth * scale, 2 * ioHalfWidth * scale}
   end
 
   for i, inp in ipairs(self.input) do
     x, y = self:inputCoords(i)
     x, y = drawx + (x - ioHalfWidth) * scale, drawy + (y - ioHalfWidth) * scale
-    inp.mouseCollider:set{x, y, 2 * ioHalfWidth * scale, 2 * ioHalfWidth * scale}
-  end
-end
-
-function Logic:updateWorldCollider()
-  local data = {
-    self.x, self.y,
-    self.w * self.scale, self.h * self.scale
-  }
-  if not self.worldCollider then
-    self.worldCollider = Collider:rect(data)
-  else
-    self.worldCollider:set(data)
+    inp.collider:set{x, y, 2 * ioHalfWidth * scale, 2 * ioHalfWidth * scale}
   end
 end
 
@@ -1152,19 +1094,8 @@ function Logic:pick(mouse)
 end
 
 function Logic:place(mouse)
-  if
-    mouse.hoveredObject and
-    mouse.hoveredObject.class == 'Board' and
-    mouse.hoveredObject:canBeInserted(
-      self,
-      Collider:rect{self.x, self.y,
-      self.w * mouse.hoveredObject.scale,
-      self.h * mouse.hoveredObject.scale}
-    ) then
-      --self.x, self.y = mouse.insertX, mouse.insertY
-      --mouse.insertX, mouse.insertY = nil, nil
-      mouse.hoveredObject:insert(self)
-      return
+  if mouse.hoveredObject and mouse.hoveredObject.class == 'Board' then
+    return
   end
   return self
 end
@@ -1264,5 +1195,7 @@ function Logic.drawSignSymbol(node, x, y, scale, shapeWidth, color)
     )
   end
 end
+
+rawset(_G, '_ALLOWGLOBALS', true)
 
 return Logic

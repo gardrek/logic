@@ -18,55 +18,51 @@ SHOW_MOUSE_INFO = false
 COLOR_MODE = {NONE = 0, NORMAL = 1, SIGN = 2}
 COLOR_MODE.CURRENT = COLOR_MODE.NORMAL
 
+_ALLOWGLOBALS = nil
+
 -- TODO: switch over to using vectors for more than just Color and colliders
+
 local Vector = require('Vector')
-
 local Collider = require('Collider')
-
--- colors for theming, etc and maybea function or two
 local Color = require('Color')
-
--- This library is used to create and control the Logic gates, sensors,  that make up Logic circuitry
 local Logic = require('Logic')
-
 local Board = require('Board')
 
---inspect = require('inspect')
+--local inspect = require('inspect')
 
-mainboard = Board:new{
+local mainboard = Board:new{
   x = 20, y = 10,
   w = 32, h = 20,
   scale = 32,
 }
 
-camera = {
+local camera = {
   x = -40, y = -30,
-  --zoom = 1,
   minZoom = 1 / 32, maxZoom = 32,
   zoomLevels = {
-    1/16, 1/8, 1/4, 1/2,
-    1, 1.25, 1.5, 1.75, 2,
-    2.5, 3, 3.5, 4,
-    5, 6, 7, 8,
-    10, 12, 14, 16,
-    20, 24, 28, 32,
-    --40, 48, 56, 64,
-    --80, 96, 112, 128,
+    1/16, 3/32, 1/8, 3/16,
+    1/4,  3/8,  1/2, 3/4,
+    1,
+    1.25,  1.5,   1.75,  2,
+    2.5,   3,     3.5,   4,
+    5,     6,     7,     8,
+    10,   12,    14,    16,
+    20,   24,    28,    32,
+    --40,   48,    56,    64,
+    --80,   96,   112,   128,
   },
-  zoomIndex = 5
+  zoomIndex = 8 + 1
 }
 
 camera.zoom = camera.zoomLevels[camera.zoomIndex]
 
-mouse = {
+local mouse = {
   pressed = {},
   down = {},
   number_of_buttons = 3, -- TODO: make this not necessarily constant? controls change based on number of buttons available?
   scroll_speed = 10,
   camera = camera,
 }
-
-rawset(_G, '_ALLOWGLOBALS', false)
 
 function love.load()
   io.stdout:setvbuf('no') -- enable normal use of the print() command
@@ -137,7 +133,7 @@ function love.load()
   ---[[
   local components = {
     {'Mouse', 'Joypad', 'Random',},
-    {'PassThru', 'NOT', 'Negate', 'Truth', 'ABS', 'Sign',},
+    {'NOT', 'Negate', 'Truth', 'ABS', 'Sign',},
     {'OR', 'AND', 'AVG', 'SignSplit', 'Add',},
     {'LED', 'ProgBar', 'Multimeter',},
   }
@@ -147,14 +143,15 @@ function love.load()
     maxw = 0
     offy = 1
     for yi, name in ipairs(cat) do
-      obj = mainboard:insertNew(name, offx, offy)
+      --obj = mainboard:insertNew(name, offx , offy)
+      obj = mainboard:insertNew(name, offx * mainboard.scale + mainboard.x, offy * mainboard.scale + mainboard.y)
       offy = offy + Logic.components[name].h + 1
       maxw = math.max(Logic.components[name].w, maxw)
     end
     offx = offx + maxw + 1
   end
   for yi = 1, 8 do
-    mainboard:insertNew('Colorize', offx, yi * 2 - 1)
+    mainboard:insertNew('Colorize', offx * mainboard.scale + mainboard.x, (yi * 2 - 1) * mainboard.scale + mainboard.y)
   end
   --]]
   --for name in pairs(Logic.components) do print(name) end
@@ -176,19 +173,37 @@ function love.draw()
       local comp = mouse.heldObject.parent
       x1, y1 = mouse.heldObject:Coords()
       x1, y1 = camera:project(
-        (comp.x + x1) * comp.board.scale + comp.board.x,
-        (comp.y + y1) * comp.board.scale + comp.board.y
+        comp.x + x1 * comp.scale,
+        comp.y + y1 * comp.scale
       )
-      scale1 = comp.board.scale * camera.zoom
-      --Logic:drawHangingWire(offx, offy, scale1, mouse.heldObject, x1, y1, mouse.x, mouse.y)
+      scale1 = comp.scale * camera.zoom
       Logic:drawHangingWire(0, 0, scale1, mouse.heldObject, x1, y1, mouse.x, mouse.y)
       mouse.heldObject:drawIONode('o', x1, y1, scale1)
       mouse.heldObject:drawIONode('arrow', mouse.x, mouse.y, scale1)
     elseif mouse.heldObject.class == 'Component' then
-      local scale = camera.zoom * 32
       local obj = mouse.heldObject
-      obj.x, obj.y = mouse.x - obj.w / 2 * scale, mouse.y - obj.h / 2 * scale
-      obj:draw(obj.x, obj.y, scale)
+      local x1, y1 = camera:reverseProject(mouse.x, mouse.y)
+      obj.x, obj.y =
+        x1 - obj.w / 2 * obj.scale,
+        y1 - obj.h / 2 * obj.scale
+      local board
+      if mouse.hoveredObject then
+        if mouse.hoveredObject.class == 'Board' then
+          board = mouse.hoveredObject
+        elseif
+          mouse.hoveredObject.board and
+          mouse.hoveredObject.board.class == 'Board' then
+            board = mouse.hoveredObject.board
+        end
+      end
+      if board then
+        obj.x, obj.y =
+        --mouse.insertX, mouse.insertY =
+          math.floor((obj.x - board.x) / board.scale + 0.5) * board.scale + board.x,
+          math.floor((obj.y - board.y) / board.scale + 0.5) * board.scale + board.y
+      end
+      obj:updateMouseColliders(camera)
+      obj:drawAll(camera)
     end
   end
   if SHOW_MOUSE_INFO then
@@ -213,12 +228,15 @@ end
 
 function love.update(dt)
   mouse:update{mainboard}
-  --mainboard:update()
+  mainboard:update()
   mainboard:updateColliders(camera)
   for index, obj in ipairs(mainboard.components) do
     --if obj.mouseInput then obj:mouseInput() end
     if obj.update then obj:update() end
     --if obj.collider then obj:updateColliders(camera, mainboard) end
+  end
+  if mouse.heldObject and mouse.heldObject.class == 'Component' then
+    mouse.heldObject:update()
   end
 
   -- new, better  idea: update colliders here, as we need the camera and the mainboard, and only visible components need colliders
@@ -308,12 +326,35 @@ function love.mousepressed(x, y, button, istouch)
       mouse:pick()
     end
   elseif button == 2 then
-    if mouse.heldObject and mouse.heldObject.class == 'Value' then
-      mouse:releaseObject()
+    if mouse.heldObject then
+      if mouse.heldObject.class == 'Value' then
+        mouse:releaseObject()
+      elseif
+        mouse.heldObject.class == 'Component'
+        --and mouse.heldObject.base == 'PassThru'
+        then
+          mouse.heldObject:unlinkAll()
+          mouse:releaseObject()
+      end
     end
   elseif button == 3 then
-    if not mouse.heldObject and (not mouse.hoveredObject or mouse.hoveredObject.class == 'Board') then
-      mouse:startDragScroll()
+    if mouse.heldObject then
+      if mouse.heldObject.class == 'Component' then
+        local obj = mouse.heldObject
+        if mouse:place() then
+          mouse.heldObject = obj:dup()
+        end
+      end
+    else
+      if mouse.hoveredObject then
+        if mouse.hoveredObject.class == 'Board' then
+          mouse:startDragScroll()
+        elseif mouse.hoveredObject.class == 'Component' then
+          mouse.heldObject = mouse.hoveredObject:dup()
+        end
+      else
+        mouse:startDragScroll()
+      end
     end
   end
 end
@@ -356,37 +397,40 @@ function mouse:update()
     if hit then return true, nil else return false, nil end
   end
   mouse.hoveredObject = nil
-  mainboard.collider:collide(mouse.collider, hitCallback) -- set collision on mainboard
-  -- should 'if' block this out if the mouse isn't colliding with the mainboard?
+  mainboard.mouseCollider:collide(mouse.collider, hitCallback) -- set collision on mainboard
+  -- should block this out if the mouse isn't colliding with the mainboard? that would completely disallow overhanging
   for _, obj in ipairs(mainboard.components) do
     local exitLoop
     for o, out in ipairs(obj.output) do
-      if out.collider:collide(mouse.collider, hitCallback) then
+      if out.mouseCollider:collide(mouse.collider, hitCallback) then
         exitLoop = true
-        mainboard.collider.hit = false
-        obj.collider.hit = false
+        mainboard.mouseCollider.hit = false
+        obj.mouseCollider.hit = false
         mouse.hoveredObject = out
         break
       end
     end
     if exitLoop then break end
     for i, inp in ipairs(obj.input) do
-      if inp.collider:collide(mouse.collider, hitCallback) then
+      if inp.mouseCollider:collide(mouse.collider, hitCallback) then
         exitLoop = true
-        mainboard.collider.hit = false
-        obj.collider.hit = false
+        mainboard.mouseCollider.hit = false
+        obj.mouseCollider.hit = false
         mouse.hoveredObject = inp
         break
       end
     end
     if exitLoop then break end
-    if obj ~= mouse.heldObject and obj.collider:collide(mouse.collider, hitCallback) then
-      mainboard.collider.hit = false
+    if obj ~= mouse.heldObject and obj.mouseCollider:collide(mouse.collider, hitCallback) then
+      mainboard.mouseCollider.hit = false
       mouse.hoveredObject = obj
     end
   end
-  if not mouse.hoveredObject and mainboard.collider.hit then
+  if not mouse.hoveredObject and mainboard.mouseCollider.hit then
     mouse.hoveredObject = mainboard
+  end
+  if mouse.heldObject then
+    mouse.heldObject.mouseCollider.hit = false
   end
   --print(mouse.hoveredObject)
 end
@@ -399,7 +443,11 @@ end
 
 function mouse:place()
   if self.heldObject and self.heldObject.place then
-    self.heldObject = self.heldObject:place(self)
+    local obj = self.heldObject:place(self)
+    if obj ~= self.heldObject then
+      self.heldObject = obj
+      return true
+    end
   end
 end
 
@@ -420,7 +468,7 @@ function mouse:endDragScroll()
   mouse.dragScroll = false
 end
 
-function camera:project(x, y, w, h, scale)
+function camera:projectRect(x, y, w, h, scale)
   x = x or 0
   y = y or 0
   w = w or 1
@@ -431,6 +479,14 @@ function camera:project(x, y, w, h, scale)
     x * self.zoom - self.x, y * self.zoom - self.y,
     w * nscale, h * nscale,
     nscale
+end
+
+function mouse:reverseProject()
+  return self.camera:reverseProject(self.x, self.y)
+end
+
+function camera:project(x, y)
+  return x * self.zoom - self.x, y * self.zoom - self.y
 end
 
 function camera:reverseProject(x, y)

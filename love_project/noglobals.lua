@@ -3,11 +3,9 @@
 -- stops globals from being created, but not from being used once created
 -- so you can call this after all your globals are initialized and be fine
 
-local getinfo, error, rawset, rawget = debug.getinfo, error, rawset, rawget
-
 local mt = getmetatable(_G)
 
-if mt == nil then
+if not mt then
   mt = {}
   setmetatable(_G, mt)
 end
