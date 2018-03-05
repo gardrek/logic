@@ -59,10 +59,38 @@ camera.zoom = camera.zoomLevels[camera.zoomIndex]
 local mouse = {
   pressed = {},
   down = {},
-  number_of_buttons = 3, -- TODO: make this not necessarily constant? controls change based on number of buttons available?
+  number_of_buttons = 3,
   scroll_speed = 10,
   camera = camera,
 }
+
+mouse.shape = {
+  -100, -100,
+   100, -100,
+  -100,  100,
+  -100,  100,
+}
+
+local function createHighlightImage(radius, color)
+  radius = radius or 64
+  color = {unpack(color)} or {0xaa, 0xaa, 0x55, 0xff}
+  if not color[4] then color[4] = 0xff end
+  color = Vector:new(color)
+
+  local highlightImage = love.image.newImageData(radius * 2 + 2, radius * 2 + 2)
+
+  highlightImage:mapPixel(function(x, y, r, g, b, a)
+    x = x - radius
+    y = y - radius
+    color[4] = 255 - math.min((math.sqrt(x * x + y * y) / radius) * 255, 255)
+    return unpack(color)
+    --return r, g, b, a
+  end)
+
+  return love.graphics.newImage(highlightImage)
+end
+
+mouse.highlightImage = createHighlightImage(64, Color.Yellow)
 
 function love.load()
   io.stdout:setvbuf('no') -- enable normal use of the print() command
@@ -161,6 +189,11 @@ function love.draw()
   love.graphics.clear(Color.BG)
   mainboard:draw(camera)
   if mouse.heldObject then
+    mouse:drawHighlight(camera, mouse.heldObject, mouse.highlightImage)
+  elseif mouse.hoveredObject then
+    mouse:drawHighlight(camera, mouse.hoveredObject, mouse.highlightImage)
+  end
+  if mouse.heldObject then
     if mouse.heldObject.class == 'Value' then
       local x1, y1, scale1
       x1, y1 = mouse.heldObject:Coords()
@@ -191,9 +224,16 @@ function love.draw()
         if mouse.hoveredObject.class == 'Board' then
           board = mouse.hoveredObject
         elseif
+          mouse.hoveredObject.class == 'Value' or
+          mouse.hoveredObject.class == 'Input' and
+          mouse.hoveredObject.parent then
+            board = mouse.hoveredObject.parent.board
+        --[[
+        elseif
           mouse.hoveredObject.board and
           mouse.hoveredObject.board.class == 'Board' then
             board = mouse.hoveredObject.board
+        --]]
         end
       end
       if board then
@@ -224,6 +264,7 @@ function love.draw()
       love.graphics.print(tostring(mouse.hoveredObject.class) .. ' ' .. tostring(mouse.hoveredObject), offx, offy + 80)
     end
   end
+  mouse:draw(camera)
 end
 
 function love.update(dt)
@@ -306,6 +347,9 @@ function love.wheelmoved(x, y)
   if love.keyboard.isDown('lctrl') or love.keyboard.isDown('rctrl') then
     camera.zoomIndex = math.min(math.max(1, camera.zoomIndex + y), #camera.zoomLevels)
     camera.zoom = camera.zoomLevels[camera.zoomIndex]
+    -- TODO: FIXME: center/recenter the camera after a zoom
+    --local dx, dy = 0, 0
+    --camera.x, camera.y = camera.x + dx, camera.y + dy
   else
     local dx, dy = x * -32, y * -32
     if love.keyboard.isDown('lshift') or love.keyboard.isDown('rshift') then
@@ -333,7 +377,6 @@ function love.mousepressed(x, y, button, istouch)
         mouse.heldObject.class == 'Component'
         --and mouse.heldObject.base == 'PassThru'
         then
-          mouse.heldObject:unlinkAll()
           mouse:releaseObject()
       end
     end
@@ -435,6 +478,31 @@ function mouse:update()
   --print(mouse.hoveredObject)
 end
 
+function mouse:draw(cam)
+  love.graphics.setLineWidth(cam.zoom / 16)
+  love.graphics.setLineJoin('miter')
+  local color = Color.Magenta / 3
+  love.graphics.setColor(color)
+  love.graphics.polygon('fill', self.shape)
+  love.graphics.setColor(color * 2)
+  love.graphics.polygon('line', self.shape)
+end
+
+function mouse:drawHighlight(cam, obj, image)
+  if obj.class == 'Input' or obj.class == 'Value' then
+    obj = obj.parent
+  end
+  if obj.class == 'Component' then
+    love.graphics.setColor(Color.FullWhite)
+    local drawX, drawY = cam:project(obj.x + obj.w / 2 * obj.scale, obj.y + obj.h / 2 * obj.scale)
+    local iw, ih = image:getWidth(), image:getHeight()
+    local scale = math.min(image:getWidth(), image:getHeight())
+    --local scaleX, scaleY = obj.w / scale * obj.scale * cam.zoom * 1.75, obj.h / scale * obj.scale * cam.zoom * 1.75
+    local scaleX, scaleY = (obj.w + 1.5) / scale * obj.scale * cam.zoom, (obj.h + 1.5) / scale * obj.scale * cam.zoom
+    love.graphics.draw(image, drawX, drawY, 0, scaleX, scaleY, iw / 2 + 0.5, ih / 2 + 0.5)
+  end
+end
+
 function mouse:pick()
   if self.hoveredObject and self.hoveredObject.pick then
     self.heldObject = self.hoveredObject:pick(self)
@@ -452,7 +520,14 @@ function mouse:place()
 end
 
 function mouse:releaseObject()
-  self.heldObject = nil
+  local rObj
+  if self.heldObject.mouseDelete then
+    rObj = self.heldObject:mouseDelete(self)
+  end
+  if self.heldObject.class == 'Component' then
+    mouse.heldObject:unlinkAll()
+  end
+  self.heldObject = rObj
 end
 
 function mouse:startDragScroll()

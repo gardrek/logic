@@ -48,7 +48,7 @@ function Vector:dup()
       obj[i] = self[Vector.name[n]]
     end
   end
-  setmetatable(obj, getmetatable(self))
+  setmetatable(obj, getmetatable(self) or Vector)
   return obj
 end
 

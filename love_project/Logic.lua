@@ -58,7 +58,13 @@ function Value:place(mouse)
           return obj
         else
           self.place = nil
+          self.mouseDelete = nil
           return self.output[1]
+        end
+      end
+      comp.mouseDelete = function(self, mouse)
+        if self.input[1].link then
+          return self.input[1].link.val
         end
       end
       return comp
@@ -90,8 +96,8 @@ Logic.components = {
       if love.keyboard.isDown('right') then v = v + 1.0 end
       self.output[1]:setvoltage(v)
       v = 0
-      if love.keyboard.isDown('up') then v = v - 1.0 end
-      if love.keyboard.isDown('down') then v = v + 1.0 end
+      if love.keyboard.isDown('down') then v = v - 1.0 end
+      if love.keyboard.isDown('up') then v = v + 1.0 end
       self.output[2]:setvoltage(v)
     end,
   },
@@ -327,6 +333,7 @@ Logic.components = {
       self.output[1]:setvoltage(math.abs(voltage))
     end,
   },
+
   Sign = {
     displayName = 'Sign',
     w = 1, h = 1,
@@ -432,14 +439,14 @@ Logic.components = {
     outputs = 1,
     init = function(self)
       self.color = Color:random()
-      self.default = Value:new{color = self.color}
+      self.input[1].default = Value:new{color = self.color}
     end,
     update = function(self)
       local node
       if self.input[1].link then
         node = self.input[1].link.val
       else
-        node = self.default
+        node = self.input[1].default
       end
       --self.color = node.color or Color.BasicGate
       self.output[1]:set(node)

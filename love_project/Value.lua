@@ -97,7 +97,7 @@ function Value:drawIONode(nodeType, x, y, radius)
       x + 1.5 * scale, y - 5 * scale,
       x + 1.5 * scale, y + 5 * scale,
       x - 3.5 * scale, y + 5 * scale,
-      x - 0.5 * scale, y + 1.5 * scale,
+      x - 0.5 * scale, y + scale,
       -- FIXME: ??? profit? literally no idea why ^^this y co-ordinate^^ works. I must be doing something awfully wrong somehow
       x - 3.5 * scale, y - 5 * scale
     )
