@@ -163,7 +163,7 @@ function love.load()
     {'Mouse', 'Joypad', 'Random',},
     {'NOT', 'Negate', 'Truth', 'ABS', 'Sign',},
     {'OR', 'AND', 'AVG', 'SignSplit', 'Add',},
-    {'LED', 'ProgBar', 'Multimeter',},
+    {'LED', 'ProgBar', 'Multimeter', 'NegProgBar',},
   }
   local offx, offy, maxw, obj
   offx = 1
@@ -489,18 +489,26 @@ function mouse:draw(cam)
 end
 
 function mouse:drawHighlight(cam, obj, image)
+  local drawX, drawY, scaleX, scaleY
+  local iw, ih = image:getWidth(), image:getHeight()
+  local scale = math.min(iw, ih)
   if obj.class == 'Input' or obj.class == 'Value' then
-    obj = obj.parent
+    local x, y
+    if obj.class == 'Input' then
+      x, y = obj.parent:inputCoords(obj.index)
+    else
+      x, y = obj:Coords()
+    end
+    drawX, drawY = cam:project((x) * obj.parent.scale + obj.parent.x, (y) * obj.parent.scale + obj.parent.y)
+    scaleX, scaleY = 0.25 * cam.zoom, 0.25 * cam.zoom
+  elseif obj.class == 'Component' then
+    drawX, drawY = cam:project(obj.x + obj.w / 2 * obj.scale, obj.y + obj.h / 2 * obj.scale)
+    scaleX, scaleY = (obj.w + 1.5) / scale * obj.scale * cam.zoom, (obj.h + 1.5) / scale * obj.scale * cam.zoom
+  else
+    return
   end
-  if obj.class == 'Component' then
-    love.graphics.setColor(Color.FullWhite)
-    local drawX, drawY = cam:project(obj.x + obj.w / 2 * obj.scale, obj.y + obj.h / 2 * obj.scale)
-    local iw, ih = image:getWidth(), image:getHeight()
-    local scale = math.min(image:getWidth(), image:getHeight())
-    --local scaleX, scaleY = obj.w / scale * obj.scale * cam.zoom * 1.75, obj.h / scale * obj.scale * cam.zoom * 1.75
-    local scaleX, scaleY = (obj.w + 1.5) / scale * obj.scale * cam.zoom, (obj.h + 1.5) / scale * obj.scale * cam.zoom
-    love.graphics.draw(image, drawX, drawY, 0, scaleX, scaleY, iw / 2 + 0.5, ih / 2 + 0.5)
-  end
+  love.graphics.setColor(Color.FullWhite)
+  love.graphics.draw(image, drawX, drawY, 0, scaleX, scaleY, iw / 2 + 0.5, ih / 2 + 0.5)
 end
 
 function mouse:pick()

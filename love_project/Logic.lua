@@ -655,6 +655,52 @@ Logic.components = {
     end,--]]
   },
 
+  NegProgBar = {
+    displayName = 'NegProgBar',
+    w = 2, h = 1,
+    color = Color.FullWhite,
+    inputs = 1,
+    update = function(self)
+      local node
+      if self.input[1] and self.input[1].link then
+        node = self.input[1].link.val
+      else
+        node = self.input[1].default
+      end
+      self.color = node.color
+    end,
+    ---[[
+    draw = function(self, cam)
+      local drawx, drawy = cam:project(self.x, self.y)
+      local scale = self.scale * cam.zoom
+      local node
+      if self.input[1] and self.input[1].link then
+        node = self.input[1].link.comp.output[self.input[1].link.index]
+      else
+        node = self.input[1].default
+      end
+      local length = node:getvoltage() / 2
+      local padding = scale / 32
+      love.graphics.setColor(Color.Black)
+      love.graphics.rectangle(
+        'fill', drawx + 2 * padding, drawy + 2 * padding,
+        self.w * scale - 4 * padding, self.h * scale - 4 * padding
+      )
+      love.graphics.setColor(node.color)
+      love.graphics.setLineWidth(padding)
+      love.graphics.rectangle(
+        'line', drawx + 2 * padding, drawy + 2 * padding,
+        self.w * scale - 4 * padding, self.h * scale - 4 * padding
+      )
+      love.graphics.rectangle(
+        'fill',
+        drawx + scale / self.w * 2,
+        drawy + 5 * padding,
+        (self.w * scale - 10 * padding) * length,
+        self.h * scale - 10 * padding
+      )
+    end,--]]
+  },
   Multimeter = {
     displayName = 'Multimeter',
     w = 2, h = 2,
