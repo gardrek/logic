@@ -1,0 +1,21 @@
+
+wire bus to allowing connecting more than one wire at once:
+  connect wires into a connector
+  connector alows you to pick up and connect wires all at once
+  numbered by default, names allow you to make things compatible without having to remember order
+
+
+pull individual lines out of a bus:
+  a bus can be placed to make a thing similar to a "node"
+    but besides pulling the whole bus out you can also pull out individual lines
+
+
+color coded views:
+  normal - each wire has a color
+  value - cyan-blue for positive, orange-yellow for negative
+  wires for busses? - wires on a bus are colored based on their position?
+  heat map - indicates how often a value is updated with hue ranging from dark black to blue to red
+
+Instead of using pass-through "nodes" to control inputs and outputs of circuit boards, just have them be an adjustable object themselves
+  they can still be automatically created and positioned, but also manually (perhaps right click on the borders of the board)
+

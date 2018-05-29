@@ -1,0 +1,6 @@
+[package]
+name = "logwi"
+version = "0.1.0"
+authors = ["gardrek <gardrek.the.destroyer@gmail.com>"]
+
+[dependencies]
