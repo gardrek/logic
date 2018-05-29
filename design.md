@@ -1,9 +1,9 @@
 # High-level design
 ## Components
 
-The basic unit of logic is a component. Components can be described as a variable number of inputs, a variable number of outputs, an optional internal state, and a function which may:
-  * read any number of the inputs
-  * write to any number of the outputs
+The basic unit of logic is a component. Components can be described as a variable number of inputs, a variable number of outputs, an optional internal state, and an update function. When called, the update function can perform any combination of the following tasks:
+  * read any combination of input terminals
+  * write to any combination of output terminals
   * read or modify its own internal state
   * read or modify the virtual world state
 
@@ -11,6 +11,8 @@ Components also have a visual representation, consisting of:
   * the main body, either a unique shape or a rectangle with an identifying name
   * optional input terminals on the left side
   * optional output terminals on the right side
+
+The body of a component is a whole number of units wide and tall, typically two units wide and as many units tall as necessary to fit the input and output terminals, with one terminal in each category per unit. Input and output terminals are typically centered vertically, spaced one unit apart.
 
 ### Wires, Terminals, and Connection
 
