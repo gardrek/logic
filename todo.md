@@ -5,7 +5,7 @@ TODO
   * Add and tweak components
   * Delete components without necessarily having a dedicated button
 * Properly support arbitrary number of circuit boards, and wiring between them
-* With all of the above, I can support "Component-izing" boards
 * Save and undo system(s)
+* With all of the above, I can support "Component-izing" boards
 * Wire routing (visual)
 * Wire bundles/connectors

@@ -289,7 +289,8 @@ Logic.components = {
       local drawx, drawy = cam:project(self.x, self.y)
       local scale = self.scale * cam.zoom
       local color = self.color or Color.Fallback
-      local darkColor = {color[1] / 3, color[2] / 3, color[3] / 3}
+      local darkColor = color / 3
+      local mediumColor = darkColor * 2
       local padding = scale / 32
       local shape = {
         drawx + 2 * padding, drawy + 2 * padding,
@@ -302,13 +303,13 @@ Logic.components = {
       love.graphics.setLineJoin('miter')
       love.graphics.polygon('fill', shape)
 
-      love.graphics.setColor(color)
+      love.graphics.setColor(mediumColor)
       love.graphics.polygon('line', shape)
 
       love.graphics.setColor(darkColor)
       love.graphics.circle('fill', drawx + self.w * scale - 6 * padding, drawy + self.h * scale / 2, padding * 5)
 
-      love.graphics.setColor(self.color)
+      love.graphics.setColor(mediumColor)
       love.graphics.circle('line', drawx + self.w * scale - 6 * padding, drawy + self.h * scale / 2, padding * 5)
     end,--]]
   },
@@ -1228,6 +1229,13 @@ end
 
 function Logic:outputCoords(o)
   return self.w, (o - 0.5) * self.h / #self.output
+end
+
+function Logic:setColor(c)
+  self.color = c
+  if type(self.default) == 'table' and self.default.class == 'Value' then
+    self.default.color = c
+  end
 end
 
 function Logic.drawWire(offx, offy, scale, val, points)

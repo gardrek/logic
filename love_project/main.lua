@@ -73,8 +73,8 @@ mouse.shape = {
 
 local function createHighlightImage(radius, color)
   radius = radius or 64
-  color = {unpack(color)} or {0xaa, 0xaa, 0x55, 0xff}
-  if not color[4] then color[4] = 0xff end
+  color = {unpack(color)} or Color:new{0xaa, 0xaa, 0x55, 0xff} / 0xfe
+  if not color[4] then color[4] = 1 end
   color = Vector:new(color)
 
   local highlightImage = love.image.newImageData(radius * 2 + 2, radius * 2 + 2)
@@ -82,7 +82,7 @@ local function createHighlightImage(radius, color)
   highlightImage:mapPixel(function(x, y, r, g, b, a)
     x = x - radius
     y = y - radius
-    color[4] = 255 - math.min((math.sqrt(x * x + y * y) / radius) * 255, 255)
+    color[4] = 1 - math.min((math.sqrt(x * x + y * y) / radius), 1)
     return unpack(color)
     --return r, g, b, a
   end)
@@ -179,7 +179,9 @@ function love.load()
     offx = offx + maxw + 1
   end
   for yi = 1, 8 do
-    mainboard:insertNew('Colorize', offx * mainboard.scale + mainboard.x, (yi * 2 - 1) * mainboard.scale + mainboard.y)
+    local dye =
+      mainboard:insertNew('Colorize', offx * mainboard.scale + mainboard.x, (yi * 2 - 1) * mainboard.scale + mainboard.y)
+    --dye:setColor(Color.BasicGate)
   end
   --]]
   --for name in pairs(Logic.components) do print(name) end
