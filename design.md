@@ -1,7 +1,7 @@
 # High-level design
 ## Components
 
-The basic unit of logic is a component. Components can be described as a variable number of inputs, a variable number of outputs, an optional internal state, and an update function. When called, the update function can perform any combination of the following tasks:
+The basic unit of logic in a Logwi net is a component. Components can be described as a variable number of inputs, a variable number of outputs, an optional internal state, and an update function. When called, the update function can perform any combination of the following tasks:
   * read the value of any number of the input terminals
   * write a value to any number of the output terminals
   * read or modify its own internal state
@@ -16,7 +16,7 @@ The body of a component is a whole number of units wide and tall, typically two 
 
 ### Wires, Terminals, and Connection
 
-Input terminals on a component are numbered from top to bottom, starting with `0`. The output terminals are numbered in the same fashion. Additionally, each terminal can have an identifying label. No two terminals on a component can have the same label.
+Input terminals on a component are numbered from top to bottom, starting with `0`. The output terminals are numbered in the same fashion. Additionally, each terminal can have an identifying label. No two terminals on a component can have the same label. [REMARK: would having a separate namespace for input and output be easier to implement? Would it make more sense?]
 
 Components are connected to each other using wires. A directional wire can connect from a single output terminal to any number of input terminals, including those on the same component. Wires carry a value from output terminals to input terminals. That is, whatever the output terminal's value is, all connected input terminals will have the same value.
 

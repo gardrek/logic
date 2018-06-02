@@ -1,68 +1,57 @@
-type Internal = i32;
-const INTERNAL_MAX:i32 = std::i32::MAX;
+pub mod value;
+use value::Value;
 
-#[derive(Debug, Clone)]
-pub struct Value {
-    voltage: Internal,
-    error: bool,
+pub struct Board {
+    components: Vec<Component>,
 }
 
-impl Value {
-    /*fn and(&self, &other: Value) -> Value {
-        
-    },*/
-}
-
-impl From<f64> for Value {
-    fn from(n: f64) -> Value {
-        let mut n = n;
-        let mut error = false;
-        if n > 1.0 {
-            n = 1.0;
-            error = true;
-        } else if n < -1.0 {
-            n = -1.0;
-            error = true;
-        }
-        Value {
-            voltage: (n * INTERNAL_MAX as f64) as Internal,
-            error,
+impl Board {
+    pub fn new() -> Board {
+        Board {
+            components: vec![],
         }
     }
 }
 
-impl Into<f64> for Value {
-    fn into(self) -> f64 {
-        (self.voltage as f64) / (INTERNAL_MAX as f64)
-    }
+pub enum ComponentKind {
+    //Board,
+    And,
 }
-
-/*
-impl std::ops::Add<Value> for Value {
-    type Output = Value;
-
-    fn add(self, other: Value) -> Value {
-        let voltage = self.voltage + other.voltage;
-        let (voltage, error) = Value::internal_clamp(voltage);
-        let error = error | self.error | other.error;
-        Value { voltage, error }
-    }
-}
-*/
-
-
 
 pub struct Component {
+    kind: ComponentKind,
     inputs: Vec<Value>,
+    //inputs: Vec<Option<(usize, usize)>>,
     //outputs: Vec<Value>,
-    default: Value,
 }
 
 impl Component {
+    //pub fn new_and(n: usize) -> Component {}
+
+    pub fn input_value(&self, index: usize) -> Value {
+        //match inputs[index] {
+            //Some((c, i)) => ,
+            //Some(link) => ,
+            //None => Value::DEFAULT,
+        //}
+        self.inputs[index].clone()
+    }
+
+    pub fn update(&self) {
+        use ComponentKind::*;
+        match self.kind {
+            And => self.update_as_and(),
+        }
+    }
+
+    fn update_as_and(&self) {
+        
+    }
+
     pub fn and(&self) -> Value {
         let mut val:f64;
         let mut maxval = 1.0;
-        let mut passthru:&Value = &self.default;
+        let mut passthru:&Value = &Value::DEFAULT;
         for v in self.inputs.iter() {
             val = v.clone().into();
             if val <= maxval {
