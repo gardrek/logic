@@ -1,7 +1,10 @@
+# Overview
+Logwi is a system for mapping logical systems using an interface akin to wiring circuits together. It can be used as a sort of "visual programming" tool, for instance, to control the behavior of entities in a game, or the flow of data through an audio synthesizer or a graphical pipeline.
+
 # High-level design
 ## Components
 
-The basic unit of logic in a Logwi net is a component. Components can be described as a variable number of inputs, a variable number of outputs, an optional internal state, and an update function. When called, the update function can perform any combination of the following tasks:
+The basic unit of logic in Logwi is a component. Components can be described as a variable number of inputs, a variable number of outputs, an optional internal state, and an update function. When called, the update function can perform any combination of the following tasks:
   * read the value of any number of the input terminals
   * write a value to any number of the output terminals
   * read or modify its own internal state
