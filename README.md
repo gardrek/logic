@@ -2,10 +2,18 @@
 
 ## Basics
 
-Left mouse button to pick up/put down
+Left Mouse Button to pick up/put down components and wires
 
-Middle Mouse button to copy (places a copy or picks up a copy)
+Middle Mouse Button on a component to pick up a copy
+
+Middle Mouse Button while holding a component to place a copy
+
+Drag Middle Mouse Button to pan
 
 Right Mouse Button on a component to open context menu
 
-mouse wheel can be used to scroll, with ctrl it can be used to zoom
+Mouse Wheel to pan
+
+Shift + Mouse Wheel to pan left and right (swaps x and y axis)
+
+Ctrl + Mouse Wheel to zoom
