@@ -8,7 +8,7 @@ pub struct Value {
 }
 
 impl Value {
-    pub const DEFAULT:Value = Value {
+    pub const DEFAULT: Value = Value {
         voltage: (0.0 * INTERNAL_MAX as f64) as Internal,
         error: false,
     };

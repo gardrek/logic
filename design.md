@@ -4,7 +4,7 @@ Logwi is a system for mapping logical systems using an interface akin to wiring 
 # High-level design
 ## Components
 
-The basic unit of logic in Logwi is a component. Components can be described as a variable number of inputs, a variable number of outputs, an optional internal state, and an update function. When called, the update function can perform any combination of the following tasks:
+The basic unit of logic in Logwi is a component. Components act primarily as logic gates, controlling the flow of data, but also as the connection to the virtual world, interacting with the environment. Components can be described as a variable number of inputs, a variable number of outputs, an optional internal state, and an update function. When called, the update function can perform any combination of the following tasks:
   * read the value of any number of the input terminals
   * write a value to any number of the output terminals
   * read or modify its own internal state

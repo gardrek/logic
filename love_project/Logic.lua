@@ -517,6 +517,38 @@ Logic.components = {
     end,
   },
 
+  Sub = {
+    displayName = 'Subtract',
+    w = 2, h = 2,
+    color = Color.BasicGate,
+    inputs = 2,
+    outputs = 1,
+    init = function(self)
+      self.default = Value:new{color = self.color}
+    end,
+    update = function(self)
+      local passthru = self.default
+      local val = 0
+      local color = self.default.color
+      local sign = 1
+      self.output[1]:set(self.default)
+      if #self.input == 0 then return end
+      for _, input in ipairs(self.input) do
+        if input.link then
+          -- FIXME: Figure out how to generalize subtract to more than two
+          -- inputs, or limit it to two inputs
+          val = val + input.link.val:getvoltage() * sign
+          color = input.link.val.color
+        end
+        sign = -sign
+      end
+      self.output[1]:set{
+        voltage = Value.clamp(val),
+        color = color,
+      }
+    end,
+  },
+
   Negate = {
     displayName = 'Neg',
     w = 1, h = 1,
@@ -559,7 +591,7 @@ Logic.components = {
         self.output[2]:setvoltage(0)
       else
         self.output[1]:setvoltage(0)
-        self.output[2]:setvoltage(voltage)
+        self.output[2]:setvoltage(-voltage)
       end
     end,
   },

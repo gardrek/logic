@@ -113,6 +113,10 @@ function Board:insertNew(...)
   return self:insert(comp)
 end
 
+function Board:insertLocal(name, x, y)
+  return self:insert(Logic:instance(name, x * self.scale + self.x, y * self.scale + self.y))
+end
+
 function Board:removeAtIndex(i)
   ---[[
   local t = self.components

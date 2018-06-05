@@ -15,13 +15,14 @@ local Color = {
 Color.BasicGate    = Color.Yellow
 Color.BasicSensor  = Color.Green
 Color.Fallback     = Color.Cyan
-Color.boardBG      = Vector:new{0x00, 0x33, 0x11}
+Color.boardBG      = Vector:new{0x00, 0xdd, 0x55} / 5
 Color.BG           = Vector:new{0x44, 0x55, 0x66}
 
 function Color:random()
   local c = Vector:new{0x55, 0x55, 0x55}
-  c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0x99
-  c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0x99
+  c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0xaa
+  c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0xaa
+  c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0xaa
   --c = self[love.math.random(1, #self)]:dup()
   return c / 0xff
 end

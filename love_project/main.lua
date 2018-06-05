@@ -22,17 +22,21 @@ _ALLOWGLOBALS = nil
 
 -- TODO: switch over to using vectors for more than just Color and colliders
 
-local Vector = require('Vector')
-local Collider = require('Collider')
-local Color = require('Color')
-local Logic = require('Logic')
-local Board = require('Board')
+local Value = require 'Value'
+local Vector = require 'Vector'
+local Collider = require 'Collider'
+local Color = require 'Color'
+local Logic = require 'Logic'
+local Board = require 'Board'
+local Menu = require 'Menu'
 
 --local inspect = require('inspect')
 
+local active_menu = false
+
 local mainboard = Board:new{
   x = 20, y = 10,
-  w = 32, h = 20,
+  w = 64, h = 32,
   scale = 32,
 }
 
@@ -91,6 +95,47 @@ local function createHighlightImage(radius, color)
 end
 
 mouse.highlightImage = createHighlightImage(64, Color.Yellow)
+
+function mouse:new_context_menu()
+  local t = {}
+  local obj
+  local held = false
+  if self.heldObject then
+    held = true
+    obj = self.heldObject
+  else
+    obj = self.hoveredObject
+  end
+  if not obj then return false end
+  if obj.class == 'Component' then
+    --[[table.insert(t, {name = 'Tweak (not implemented)', action = function()
+    end})]]
+    if not held then
+      table.insert(t, {name = 'Copy', action = function()
+        if held then
+          --if mouse:place() then
+            --mouse.heldObject = obj:dup()
+          --end
+        else
+          mouse.heldObject = obj:dup()
+        end
+      end})
+    end
+    table.insert(t, {name = 'Delete', action = function()
+      if held then
+        self:releaseObject()
+      else
+        obj:unlinkAll()
+        if obj.board then
+          obj.board:remove(obj)
+        end
+      end
+    end})
+  else
+    return false
+  end
+  return Menu:new(Vector:new{self.x, self.y}, t, {color = obj and obj.color})
+end
 
 function love.load()
   io.stdout:setvbuf('no') -- enable normal use of the print() command
@@ -162,7 +207,7 @@ function love.load()
   local components = {
     {'Mouse', 'Joypad', 'Random',},
     {'NOT', 'Negate', 'Truth', 'ABS', 'Sign',},
-    {'OR', 'AND', 'AVG', 'SignSplit', 'Add',},
+    {'OR', 'AND', 'AVG', 'SignSplit', 'Add', 'Sub',},
     {'LED', 'ProgBar', 'Multimeter', 'NegProgBar',},
   }
   local offx, offy, maxw, obj
@@ -183,8 +228,28 @@ function love.load()
       mainboard:insertNew('Colorize', offx * mainboard.scale + mainboard.x, (yi * 2 - 1) * mainboard.scale + mainboard.y)
     --dye:setColor(Color.BasicGate)
   end
+  
   --]]
   --for name in pairs(Logic.components) do print(name) end
+
+  local obj = mainboard:insertLocal('AND', 14, 1)
+  table.insert(obj.input, {
+    name = '',
+    default = Value:new{color = obj.color},
+    mouseCollider = Collider:rect{-1, -1, 1, 1},
+    index = #obj.input + 1,
+    parent = obj,
+    --link = nil,
+    pick = function(self, mouse)
+      if self.link then
+        local val = self.link.val
+        self.parent:unlinkInput(self.index)
+        return val
+      end
+    end,
+    class = 'Input',
+  })
+  obj.h = obj.h + 1
 end
 
 function love.draw()
@@ -248,6 +313,12 @@ function love.draw()
       obj:drawAll(camera)
     end
   end
+
+  if active_menu then
+    active_menu:draw(camera)
+    --error'yeee'
+  end
+
   if SHOW_MOUSE_INFO then
     love.graphics.setColor(Color.FullWhite)
     --mouse.collider:draw()
@@ -365,40 +436,56 @@ end
 function love.mousepressed(x, y, button, istouch)
   mouse.pressed[button] = true
   local gx, gy = camera:reverseProject(x, y)
-  if button == 1 then
-    if mouse.heldObject then
-      mouse:place()
-    elseif mouse.hoveredObject then
-      mouse:pick()
+
+  if active_menu then
+    for i, v in ipairs(active_menu.items) do
+      if v.collider.hit then
+        --v.collider.hit = false
+        v.action()
+        active_menu = false
+        break
+      end
     end
-  elseif button == 2 then
-    if mouse.heldObject then
-      if mouse.heldObject.class == 'Value' then
-        mouse:releaseObject()
-      elseif
-        mouse.heldObject.class == 'Component'
-        --and mouse.heldObject.base == 'PassThru'
-        then
+    active_menu = false
+  else
+    if button == 1 then
+      if mouse.heldObject then
+        mouse:place()
+      elseif mouse.hoveredObject then
+        mouse:pick()
+      end
+    elseif button == 2 then
+      if mouse.heldObject then
+        if mouse.heldObject.class == 'Value' then
           mouse:releaseObject()
-      end
-    end
-  elseif button == 3 then
-    if mouse.heldObject then
-      if mouse.heldObject.class == 'Component' then
-        local obj = mouse.heldObject
-        if mouse:place() then
-          mouse.heldObject = obj:dup()
+        elseif mouse.heldObject.class == 'Component' then
+          if mouse.heldObject.base == 'PassThru' then
+            mouse:releaseObject()
+          else
+            active_menu = mouse:new_context_menu()
+          end
         end
+      elseif mouse.hoveredObject then
+        active_menu = mouse:new_context_menu()
       end
-    else
-      if mouse.hoveredObject then
-        if mouse.hoveredObject.class == 'Board' then
-          mouse:startDragScroll()
-        elseif mouse.hoveredObject.class == 'Component' then
-          mouse.heldObject = mouse.hoveredObject:dup()
+    elseif button == 3 then
+      if mouse.heldObject then
+        if mouse.heldObject.class == 'Component' then
+          local obj = mouse.heldObject
+          if mouse:place() then
+            mouse.heldObject = obj:dup()
+          end
         end
       else
-        mouse:startDragScroll()
+        if mouse.hoveredObject then
+          if mouse.hoveredObject.class == 'Board' then
+            mouse:startDragScroll()
+          elseif mouse.hoveredObject.class == 'Component' then
+            mouse.heldObject = mouse.hoveredObject:dup()
+          end
+        else
+          mouse:startDragScroll()
+        end
       end
     end
   end
@@ -444,39 +531,48 @@ function mouse:update()
   mouse.hoveredObject = nil
   mainboard.mouseCollider:collide(mouse.collider, hitCallback) -- set collision on mainboard
   -- should block this out if the mouse isn't colliding with the mainboard? that would completely disallow overhanging
-  for _, obj in ipairs(mainboard.components) do
-    local exitLoop
-    for o, out in ipairs(obj.output) do
-      if out.mouseCollider:collide(mouse.collider, hitCallback) then
-        exitLoop = true
-        mainboard.mouseCollider.hit = false
-        obj.mouseCollider.hit = false
-        mouse.hoveredObject = out
-        break
+
+  if active_menu then
+    for i, v in ipairs(active_menu.items) do
+      if v.collider:collide(mouse.collider, hitCallback) then
       end
     end
-    if exitLoop then break end
-    for i, inp in ipairs(obj.input) do
-      if inp.mouseCollider:collide(mouse.collider, hitCallback) then
-        exitLoop = true
+  else
+    for _, obj in ipairs(mainboard.components) do
+      local exitLoop
+      for o, out in ipairs(obj.output) do
+        if out.mouseCollider:collide(mouse.collider, hitCallback) then
+          exitLoop = true
+          mainboard.mouseCollider.hit = false
+          obj.mouseCollider.hit = false
+          mouse.hoveredObject = out
+          break
+        end
+      end
+      if exitLoop then break end
+      for i, inp in ipairs(obj.input) do
+        if inp.mouseCollider:collide(mouse.collider, hitCallback) then
+          exitLoop = true
+          mainboard.mouseCollider.hit = false
+          obj.mouseCollider.hit = false
+          mouse.hoveredObject = inp
+          break
+        end
+      end
+      if exitLoop then break end
+      if obj ~= mouse.heldObject and obj.mouseCollider:collide(mouse.collider, hitCallback) then
         mainboard.mouseCollider.hit = false
-        obj.mouseCollider.hit = false
-        mouse.hoveredObject = inp
-        break
+        mouse.hoveredObject = obj
       end
     end
-    if exitLoop then break end
-    if obj ~= mouse.heldObject and obj.mouseCollider:collide(mouse.collider, hitCallback) then
-      mainboard.mouseCollider.hit = false
-      mouse.hoveredObject = obj
+    if not mouse.hoveredObject and mainboard.mouseCollider.hit then
+      mouse.hoveredObject = mainboard
+    end
+    if mouse.heldObject then
+      mouse.heldObject.mouseCollider.hit = false
     end
   end
-  if not mouse.hoveredObject and mainboard.mouseCollider.hit then
-    mouse.hoveredObject = mainboard
-  end
-  if mouse.heldObject then
-    mouse.heldObject.mouseCollider.hit = false
-  end
+
   --print(mouse.hoveredObject)
 end
 

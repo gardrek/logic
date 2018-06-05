@@ -13,6 +13,11 @@ impl Board {
     }
 }
 
+pub struct Link {
+    component_index: usize,
+    node_index: usize,
+}
+
 pub enum ComponentKind {
     //Board,
     And,
