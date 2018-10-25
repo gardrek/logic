@@ -41,7 +41,7 @@ function Value:setColor(c)
   self.color = Vector:new(c)
 end
 
---[[
+---[[
 function Value:dup(val)
   val = val or {}
   if not getmetatable(val) then

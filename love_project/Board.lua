@@ -108,12 +108,7 @@ function Board:insert(comp)
   return comp
 end
 
-function Board:insertNew(...)
-  local comp = Logic:instance(...)
-  return self:insert(comp)
-end
-
-function Board:insertLocal(name, x, y)
+function Board:insertNew(name, x, y)
   return self:insert(Logic:instance(name, x * self.scale + self.x, y * self.scale + self.y))
 end
 

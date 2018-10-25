@@ -157,7 +157,7 @@ end
 
 function Vector:__eq(other)
   if #self ~= #other then return false end
-  for i= 1, #self do
+  for i = 1, #self do
     if self[i] ~= other[i] then
       return false
     end

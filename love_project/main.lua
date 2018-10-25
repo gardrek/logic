@@ -205,10 +205,10 @@ function love.load()
 
   ---[[
   local components = {
-    {'Mouse', 'Joypad', 'Random',},
-    {'NOT', 'Negate', 'Truth', 'ABS', 'Sign',},
-    {'OR', 'AND', 'AVG', 'SignSplit', 'Add', 'Sub',},
-    {'LED', 'ProgBar', 'Multimeter', 'NegProgBar',},
+    {'Mouse', 'Joypad', 'Random', 'Clock', 'LE', 'SUB_LE', },
+    {'NOT', 'Negate', 'Truth', 'ABS', 'Sign', },
+    {'OR', 'AND', 'AVG', 'SignSplit', 'Add', 'Sub', 'NAND', },
+    {'LED', 'ProgBar', 'Multimeter', 'NegProgBar', },
   }
   local offx, offy, maxw, obj
   offx = 1
@@ -216,23 +216,26 @@ function love.load()
     maxw = 0
     offy = 1
     for yi, name in ipairs(cat) do
-      --obj = mainboard:insertNew(name, offx , offy)
-      obj = mainboard:insertNew(name, offx * mainboard.scale + mainboard.x, offy * mainboard.scale + mainboard.y)
+      obj = mainboard:insertNew(name, offx , offy)
+      --obj = mainboard:insertNew(name, offx * mainboard.scale + mainboard.x, offy * mainboard.scale + mainboard.y)
       offy = offy + Logic.components[name].h + 1
       maxw = math.max(Logic.components[name].w, maxw)
     end
     offx = offx + maxw + 1
   end
-  for yi = 1, 8 do
+
+  for yi = 1, 16 do
     local dye =
-      mainboard:insertNew('Colorize', offx * mainboard.scale + mainboard.x, (yi * 2 - 1) * mainboard.scale + mainboard.y)
+      mainboard:insertNew('Colorize', offx, yi)
+      --mainboard:insertNew('Colorize', offx * mainboard.scale + mainboard.x, (yi * 2 - 1) * mainboard.scale + mainboard.y)
     --dye:setColor(Color.BasicGate)
   end
-  
+
   --]]
   --for name in pairs(Logic.components) do print(name) end
 
-  local obj = mainboard:insertLocal('AND', 14, 1)
+  ---[[
+  local obj = mainboard:insertNew('AND', 14, 1)
   table.insert(obj.input, {
     name = '',
     default = Value:new{color = obj.color},
@@ -250,13 +253,20 @@ function love.load()
     class = 'Input',
   })
   obj.h = obj.h + 1
+  --]]
 end
 
 function love.draw()
   love.graphics.clear(Color.BG)
   mainboard:draw(camera)
   if mouse.heldObject then
-    mouse:drawHighlight(camera, mouse.heldObject, mouse.highlightImage)
+    if mouse.heldObject.class == 'Value' then
+      if mouse.hoveredObject and mouse.hoveredObject.class == 'Input' then
+        mouse:drawHighlight(camera, mouse.hoveredObject, mouse.highlightImage)
+      end
+    else
+      mouse:drawHighlight(camera, mouse.heldObject, mouse.highlightImage)
+    end
   elseif mouse.hoveredObject then
     mouse:drawHighlight(camera, mouse.hoveredObject, mouse.highlightImage)
   end
@@ -344,11 +354,22 @@ function love.update(dt)
   mouse:update{mainboard}
   mainboard:update()
   mainboard:updateColliders(camera)
+  --[[
   for index, obj in ipairs(mainboard.components) do
     --if obj.mouseInput then obj:mouseInput() end
     if obj.update then obj:update() end
     --if obj.collider then obj:updateColliders(camera, mainboard) end
   end
+  --]]
+
+  for index, obj in ipairs(mainboard.components) do
+    obj:update_internal()
+  end
+
+  for index, obj in ipairs(mainboard.components) do
+    obj:update_external()
+  end
+
   if mouse.heldObject and mouse.heldObject.class == 'Component' then
     mouse.heldObject:update()
   end

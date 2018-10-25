@@ -34,7 +34,7 @@ Logic.__index = Logic
 Logic.class = 'Component'
 
 function Value:Coords()
-  if not self.parent then error('Value has no parent.') end
+  if not self.parent then error('Cannot get coords of Value: Value has no parent.', 2) end
   return self.parent:outputCoords(self.index)
 end
 
@@ -50,6 +50,7 @@ function Value:place(mouse)
       self:link(mouse.hoveredObject)
     elseif mouse.hoveredObject.class == 'Board' then
       local comp = Logic:instance('PassThru', mouse:reverseProject())
+      comp:setColor(self.color)
       self:link(comp.input[1])
       local oldPlace = comp.place
       comp.place = function(self, mouse)
@@ -73,755 +74,15 @@ function Value:place(mouse)
   return self
 end
 
-Logic.components = {
-  Joypad = {
-    displayName = 'Joypad',
-    w = 2, h = 6,
-    color = Color.BasicSensor,
-    inputs = 0, outputs = 6,
-    outputNames = {'joyX', 'joyY', 'a', 'b', 'c', 'start'},
-    update = function(self)
-      local keyNames = {false, false, 'z', 'x', 'c', 'return'}
-      for index, name in ipairs(keyNames) do
-        if name then
-          if love.keyboard.isDown(name) then
-            self.output[index]:setvoltage(1.0)
-          else
-            self.output[index]:setvoltage(0.0)
-          end
-        end
-      end
-      local v = 0
-      if love.keyboard.isDown('left') then v = v - 1.0 end
-      if love.keyboard.isDown('right') then v = v + 1.0 end
-      self.output[1]:setvoltage(v)
-      v = 0
-      if love.keyboard.isDown('down') then v = v - 1.0 end
-      if love.keyboard.isDown('up') then v = v + 1.0 end
-      self.output[2]:setvoltage(v)
-    end,
-  },
-  Mouse = {
-    displayName = 'Mouse',
-    w =2, h = 5,
-    color = Color.BasicSensor,
-    inputs = 0,
-    outputs = 5,
-    outputNames = {'x', 'y', 'left', 'right', 'middle'},
-    --[[
-    init = function(self)
-      local c
-      for i = 1, 5 do
-        c = vector:new{0x55, 0x55, 0x55}
-        c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0x88
-        c[love.math.random(1,3)] = love.math.random(0,3) * 0x11 + 0x88
-        self.output[i]:setColor(c)
-      end
-    end,--]]
-    update = function(self)
-      local x, y = love.mouse.getPosition()
-      local w, h = love.graphics.getWidth() / 2, love.graphics.getHeight() / 2
-      --if love.mouse.isDown(1) then
-        self.output[1]:setvoltage(Value.clamp((x - w) / w))
-        self.output[2]:setvoltage(Value.clamp((y - h) / h))
-      --end
-      self.output[3]:setvoltage(love.mouse.isDown(1) and 1 or 0)
-      self.output[4]:setvoltage(love.mouse.isDown(2) and 1 or 0)
-      self.output[5]:setvoltage(love.mouse.isDown(3) and 1 or 0)
-    end,
-  },
+Logic.components = require('Components')(Logic)
 
-  Random = {
-    displayName = 'Random',
-    w = 2, h = 1,
-    color = Color.BasicSensor,
-    inputs = 0, outputs = 1,
-    update = function(self)
-      self.output[1]:setvoltage(love.math.random())
-    end,
-  },
-
-  Truth = {
-    displayName = 'True',
-    w = 1, h = 1,
-    color = Color.BasicGate,
-    inputs = 1,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local node = self.default
-      if self.input[1].link then
-        node = self.input[1].link.val
-      end
-      self.color = node.color
-      self.output[1]:set(node)
-      local voltage = self.output[1]:getvoltage()
-      if voltage == 1.0 or voltage == -1.0 then
-        self.output[1]:setvoltage(1.0)
-      else
-        self.output[1]:setvoltage(0.0)
-      end
-    end,
-    ---[[
-    --Truth
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
-      local color = self.color or Color.Fallback
-      local darkColor = {color[1] / 3, color[2] / 3, color[3] / 3}
-      local mediumColor = {color[1] / 3 * 2, color[2] / 3 * 2, color[3] / 3 * 2}
-      local padding = scale / 32
-
-      love.graphics.setColor(darkColor)
-      love.graphics.setLineWidth(padding)
-      love.graphics.rectangle(
-        'fill', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-
-      love.graphics.setColor(mediumColor)
-      love.graphics.rectangle(
-        'line', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-
-      local node
-      if self.input[1].link then
-        node = self.input[1].link.val
-      else
-        node = self.default
-      end
-
-      Logic.drawTruthSymbol(node,
-        drawx + self.w * scale / 2, drawy + self.h * scale / 2,
-        scale, self.w * 0.5, self.color
-      )
-    end,--]]
-  },
-
-  AND = {
-    displayName = 'AND',
-    w = 2, h = 2,
-    color = Color.BasicGate,
-    inputs = 2,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local passthru = self.default
-      local val
-      local node
-      local maxval = 1.0
-      for _, input in ipairs(self.input) do
-        if input.link then
-          val = math.abs(input.link.val:getvoltage())
-          node = input.link.val
-        else
-          val = math.abs(self.default:getvoltage())
-          node = self.default
-        end
-        if val <= maxval then
-          passthru = node
-          maxval = val
-        end
-      end
-      self.output[1]:set(passthru)
-    end,
-  },
-
-  OR = {
-    displayName = 'OR',
-    w = 2, h = 2,
-    color = Color.BasicGate,
-    inputs = 2,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local passthru = self.default
-      local val
-      local node
-      local maxval = 0.0
-      for _, input in ipairs(self.input) do
-        if input.link then
-          val = math.abs(input.link.val:getvoltage())
-          node = input.link.val
-        else
-          val = math.abs(self.default:getvoltage())
-          node = self.default
-        end
-        if val >= maxval then
-          passthru = node
-          maxval = val
-        end
-      end
-      self.output[1]:set(passthru)
-    end,
-  },
-
-  -- TODO: XOR
-
-  NOT = {
-    displayName = 'NOT',
-    w = 1, h = 1,
-    color = Color.BasicGate,
-    inputs = 1,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local passthru = self.default
-      if self.input[1].link then
-        passthru = self.input[1].link.val
-      end
-      self.color = passthru.color
-      self.output[1]:set(passthru)
-      local voltage = self.output[1]:getvoltage()
-      self.output[1]:setvoltage((voltage < 0.0 and -1.0 or 1.0) - voltage)
-    end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
-      local color = self.color or Color.Fallback
-      local darkColor = color / 3
-      local mediumColor = darkColor * 2
-      local padding = scale / 32
-      local shape = {
-        drawx + 2 * padding, drawy + 2 * padding,
-        drawx + self.w * scale - 6 * padding, drawy + self.h * scale / 2,
-        drawx + 2 * padding, drawy + self.h * scale - 2 * padding,
-      }
-
-      love.graphics.setColor(darkColor)
-      love.graphics.setLineWidth(padding * 2)
-      love.graphics.setLineJoin('miter')
-      love.graphics.polygon('fill', shape)
-
-      love.graphics.setColor(mediumColor)
-      love.graphics.polygon('line', shape)
-
-      love.graphics.setColor(darkColor)
-      love.graphics.circle('fill', drawx + self.w * scale - 6 * padding, drawy + self.h * scale / 2, padding * 5)
-
-      love.graphics.setColor(mediumColor)
-      love.graphics.circle('line', drawx + self.w * scale - 6 * padding, drawy + self.h * scale / 2, padding * 5)
-    end,--]]
-  },
-
-  ABS = {
-    displayName = 'Abs',
-    w = 1, h = 1,
-    color = Color.BasicGate,
-    inputs = 1,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local node = self.default
-      if self.input[1].link then
-        node = self.input[1].link.val
-      end
-      self.color = node.color
-      self.output[1]:set(node)
-      local voltage = self.output[1]:getvoltage()
-      self.output[1]:setvoltage(math.abs(voltage))
-    end,
-  },
-
-  Sign = {
-    displayName = 'Sign',
-    w = 1, h = 1,
-    color = Color.BasicGate,
-    inputs = 1,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local node = self.default
-      if self.input[1].link then
-        node = self.input[1].link.val
-      end
-      self.color = node.color
-      self.output[1]:set(node)
-      local voltage = self.output[1]:getvoltage()
-      if voltage > 0.0 then
-        self.output[1]:setvoltage(1.0)
-      elseif voltage < 0.0 then
-        self.output[1]:setvoltage(-1.0)
-      else
-        self.output[1]:setvoltage(0.0)
-      end
-    end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
-      local color = self.color or Color.Fallback
-      local darkColor = {color[1] / 3, color[2] / 3, color[3] / 3}
-      local mediumColor = {color[1] / 3 * 2, color[2] / 3 * 2, color[3] / 3 * 2}
-      local padding = scale / 32
-
-      love.graphics.setColor(darkColor)
-      love.graphics.setLineWidth(padding)
-      love.graphics.rectangle(
-        'fill', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-
-      love.graphics.setColor(mediumColor)
-      love.graphics.rectangle(
-        'line', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-
-      local node
-      if self.input[1].link then
-        node = self.input[1].link.val
-      else
-        node = self.default
-      end
-
-      Logic.drawSignSymbol(node,
-        drawx + self.w * scale / 2, drawy + self.h * scale / 2,
-        scale, self.w * 0.5, self.color
-      )
-    end,--]]
-  },
-
-  PassThru = {
-    displayName = 'PassThru',
-    w = 1, h = 1,
-    color = Color.BasicGate,
-    inputs = 1,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-      self.visual = Value:new()
-    end,
-    update = function(self)
-      local node
-      if self.input[1].link then
-        node = self.input[1].link.val
-      else
-        node = self.default
-      end
-      self.color = node.color or Color.BasicGate
-      self.output[1]:set(node)
-    end,
-    --drawOutputNodes = function() end,
-    --drawInputNodes = function() end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
-      self.visual:set(self.output[1])
-      self.visual:setvoltage(1.0)
-      self.visual:drawIONode('arrow',
-        drawx + (self.w / 2) * scale,
-        drawy + (self.h / 2) * scale,
-        scale * self.w * 2.25
-      )
-    end,--]]
-  },
-
-  Colorize = {
-    displayName = 'Dye',
-    w = 1, h = 1,
-    color = Color.BasicGate,
-    inputs = 1,
-    outputs = 1,
-    init = function(self)
-      self.color = Color:random()
-      self.input[1].default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local node
-      if self.input[1].link then
-        node = self.input[1].link.val
-      else
-        node = self.input[1].default
-      end
-      --self.color = node.color or Color.BasicGate
-      self.output[1]:set(node)
-      self.output[1]:setColor(self.color)
-    end,
-  },
-
-  AVG = {
-    displayName = 'Average',
-    w = 2, h = 2,
-    color = Color.BasicGate,
-    inputs = 2,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local passthru = self.default
-      local val = 0
-      local count = 0
-      local color
-      self.output[1]:set(self.default)
-      if #self.input == 0 then return end
-      for _, input in ipairs(self.input) do
-        if input.link then
-          val = val + input.link.val:getvoltage()
-          color = input.link.val.color
-        end
-        count = count + 1
-      end
-      if count == 0 then
-        self.output[1]:set(self.default)
-      else
-        self.output[1]:set{
-          voltage = val / count,
-          color = color,
-        }
-      end
-    end,
-  },
-
-  Add = {
-    displayName = 'Add',
-    w = 2, h = 2,
-    color = Color.BasicGate,
-    inputs = 2,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local passthru = self.default
-      local val = 0
-      local color = self.default.color
-      self.output[1]:set(self.default)
-      if #self.input == 0 then return end
-      for _, input in ipairs(self.input) do
-        if input.link then
-          val = val + input.link.val:getvoltage()
-          color = input.link.val.color
-        end
-      end
-      self.output[1]:set{
-        voltage = Value.clamp(val),
-        color = color,
-      }
-    end,
-  },
-
-  Sub = {
-    displayName = 'Subtract',
-    w = 2, h = 2,
-    color = Color.BasicGate,
-    inputs = 2,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local passthru = self.default
-      local val = 0
-      local color = self.default.color
-      local sign = 1
-      self.output[1]:set(self.default)
-      if #self.input == 0 then return end
-      for _, input in ipairs(self.input) do
-        if input.link then
-          -- FIXME: Figure out how to generalize subtract to more than two
-          -- inputs, or limit it to two inputs
-          val = val + input.link.val:getvoltage() * sign
-          color = input.link.val.color
-        end
-        sign = -sign
-      end
-      self.output[1]:set{
-        voltage = Value.clamp(val),
-        color = color,
-      }
-    end,
-  },
-
-  Negate = {
-    displayName = 'Neg',
-    w = 1, h = 1,
-    color = Color.BasicGate,
-    inputs = 1,
-    outputs = 1,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local node = self.default
-      if self.input[1].link then
-        node = self.input[1].link.val
-      end
-      self.color = node.color
-      self.output[1]:set(node)
-      self.output[1]:setvoltage(-self.output[1]:getvoltage())
-    end,
-  },
-
-  SignSplit = {
-    displayName = 'SignSplit',
-    w = 2, h = 2,
-    color = Color.BasicGate,
-    inputs = 1,
-    outputs = 2,
-    init = function(self)
-      self.default = Value:new{color = self.color}
-    end,
-    update = function(self)
-      local passthru = self.default
-      if self.input[1].link then
-        passthru = self.input[1].link.val
-      end
-      self.output[1]:set(passthru)
-      self.output[2]:set(passthru)
-      local voltage = passthru:getvoltage()
-      if voltage >= 0 then
-        self.output[1]:setvoltage(voltage)
-        self.output[2]:setvoltage(0)
-      else
-        self.output[1]:setvoltage(0)
-        self.output[2]:setvoltage(-voltage)
-      end
-    end,
-  },
-
-  LED = {
-    displayName = 'LED',
-    w = 1, h = 1,
-    color = Color.FullWhite,
-    inputs = 1,
-    update = function(self)
-      local node
-      -- might not need to check number of inputs?
-      -- might want to instead enforce number elsewhere
-      if self.input[1] and self.input[1].link then
-        node = self.input[1].link.comp.output[self.input[1].link.index]
-      else
-        node = self.input[1].default
-      end
-      self.color = --[[self.colorOverride or ]]node.color
-    end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
-      local radius = self.w * scale / 2
-      local drawx, drawy = drawx + radius, drawy + radius
-      local brightness = 0
-      local node
-      if self.input[1] and self.input[1].link then
-        node = self.input[1].link.val
-      else
-        node = self.input[1].default
-      end
-
-      brightness = math.abs(node:getvoltage())
-      love.graphics.setColor(node.color * brightness)
-      love.graphics.circle('fill', drawx, drawy, radius)
-
-      love.graphics.setColor(node.color)
-      love.graphics.setLineWidth(scale / 32)
-      love.graphics.circle('line', drawx, drawy, radius)
-
-      if SHOW_DEBUG_TEXT then
-        love.graphics.setColor(node.color)
-        love.graphics.print(tostring(node), drawx, drawy + radius)
-      end
-    end,--]]
-  },
-
-  ProgBar = {
-    displayName = 'ProgBar',
-    w = 2, h = 1,
-    color = Color.FullWhite,
-    inputs = 1,
-    update = function(self)
-      local node
-      if self.input[1] and self.input[1].link then
-        node = self.input[1].link.val
-      else
-        node = self.input[1].default
-      end
-      self.color = node.color
-    end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
-      local node
-      if self.input[1] and self.input[1].link then
-        node = self.input[1].link.comp.output[self.input[1].link.index]
-      else
-        node = self.input[1].default
-      end
-      local length = node:getvoltage()
-      local padding = scale / 32
-      love.graphics.setColor(Color.Black)
-      love.graphics.rectangle(
-        'fill', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-      love.graphics.setColor(node.color)
-      love.graphics.setLineWidth(padding)
-      love.graphics.rectangle(
-        'line', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-      love.graphics.rectangle(
-        'fill',
-        drawx + 5 * padding,
-        drawy + 5 * padding,
-        (self.w * scale - 10 * padding) * math.abs(length),
-        self.h * scale - 10 * padding
-      )
-    end,--]]
-  },
-
-  NegProgBar = {
-    displayName = 'NegProgBar',
-    w = 2, h = 1,
-    color = Color.FullWhite,
-    inputs = 1,
-    update = function(self)
-      local node
-      if self.input[1] and self.input[1].link then
-        node = self.input[1].link.val
-      else
-        node = self.input[1].default
-      end
-      self.color = node.color
-    end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
-      local node
-      if self.input[1] and self.input[1].link then
-        node = self.input[1].link.comp.output[self.input[1].link.index]
-      else
-        node = self.input[1].default
-      end
-      local length = node:getvoltage() / 2
-      local padding = scale / 32
-      love.graphics.setColor(Color.Black)
-      love.graphics.rectangle(
-        'fill', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-      love.graphics.setColor(node.color)
-      love.graphics.setLineWidth(padding)
-      love.graphics.rectangle(
-        'line', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-      love.graphics.rectangle(
-        'fill',
-        drawx + scale / self.w * 2,
-        drawy + 5 * padding,
-        (self.w * scale - 10 * padding) * length,
-        self.h * scale - 10 * padding
-      )
-    end,--]]
-  },
-  Multimeter = {
-    displayName = 'Multimeter',
-    w = 2, h = 2,
-    color = Color.FullWhite,
-    inputs = 1,
-    update = function(self)
-      local node
-      if self.input[1] and self.input[1].link then
-        node = self.input[1].link.val
-      else
-        node = self.input[1].default
-      end
-      self.color = node.color
-    end,
-    ---[[
-    draw = function(self, cam)
-      local drawx, drawy = cam:project(self.x, self.y)
-      local scale = self.scale * cam.zoom
-      local node
-      if self.input[1] and self.input[1].link then
-        node = self.input[1].link.comp.output[self.input[1].link.index]
-      else
-        node = self.input[1].default
-      end
-      local length = node:getvoltage()
-      local padding = scale / 32
-      love.graphics.setColor(Color.Black)
-      love.graphics.rectangle(
-        'fill', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-      love.graphics.setColor(node.color)
-      love.graphics.setLineWidth(padding)
-      love.graphics.rectangle(
-        'line', drawx + 2 * padding, drawy + 2 * padding,
-        self.w * scale - 4 * padding, self.h * scale - 4 * padding
-      )
-
-      Logic.drawSignSymbol(node,
-        drawx + (self.w / 4) * scale, drawy + (self.h / 4) * scale,
-        scale, self.h / 4, node.color
-      )
-
-      local brightness = math.abs(node:getvoltage())
-      love.graphics.setColor(node.color * brightness)
-      love.graphics.circle('fill',
-        drawx + (self.w * 3 / 4) * scale, drawy + (self.h / 4) * scale,
-        self.h / 8 * scale
-      )
-
-      love.graphics.setColor(node.color)
-      love.graphics.setLineWidth(padding * 2)
-      love.graphics.circle('line',
-        drawx + (self.w * 3 / 4) * scale, drawy + (self.h / 4) * scale,
-        self.h / 8 * scale
-      )
-
-      love.graphics.rectangle(
-        'fill',
-        drawx + 5 * padding,
-        drawy + (self.h / 2) * scale + 5 * padding,
-        (self.w * scale - 10 * padding) * math.abs(length),
-        (self.h / 2) * scale - 10 * padding
-      )
-
-      love.graphics.setLineWidth(padding)
-      local lineX, lineY
-      for i = 0, 2 do
-        lineX, lineY = 
-          drawx + (self.w * scale - 10 * padding) / 2 * i + 5 * padding,
-          drawy + (self.h / 2) * scale + 4 * padding
-        love.graphics.line(
-          lineX, lineY,
-          lineX, lineY - 5 * padding
-        )
-        if i < 2 then
-        lineX, lineY = 
-          drawx + (self.w * scale - 10 * padding) / 2 * i + 2.5 * padding + (self.w * scale) / 4,
-          drawy + (self.h / 2) * scale + 4 * padding
-          love.graphics.line(
-            lineX, lineY,
-            lineX, lineY - 3 * padding
-          )
-        end
-      end
-    end,--]]
-  },
-}
+local function pickInput(self, mouse)
+  if self.link then
+    local val = self.link.val
+    self.parent:unlinkInput(self.index)
+    return val
+  end
+end
 
 function Logic:instance(name, x, y)
   local base = Logic.components[name]
@@ -830,7 +91,7 @@ function Logic:instance(name, x, y)
     base = name,
     name = base.displayName or name,
     x = x, y = y,
-    w = base.w or 21, h = base.h or 21,
+    w = base.w or 2, h = base.h or 2,
     color = base.color or Color.Fallback,
     input = {},
     output = {},
@@ -849,37 +110,14 @@ function Logic:instance(name, x, y)
 
   if type(base.inputs) == 'number' then
     for i = 1, base.inputs do
-      comp.input[i] = {
-        name = inputNames[i] or '',
-        default = Value:new{color = comp.color},
-        mouseCollider = Collider:rect{-1, -1, 1, 1},
-        index = i,
-        parent = comp,
-        --link = nil,
-        pick = function(self, mouse)
-          if self.link then
-            local val = self.link.val
-            self.parent:unlinkInput(self.index)
-            return val
-          end
-        end,
-        class = 'Input',
-      }
+      comp:addInput(i, inputNames[i])
     end
-  --elseif base.inputs == 'var' then
-    -- there must be a better way to do variable number of inputs
+  --elseif type(base.inputs) == 'table' and #base.inputs == 2 then
   end
 
   if type(base.outputs) == 'number' then
     for i = 1, base.outputs do
-      comp.output[i] = Value:new{
-        name = outputNames[i] or '',
-        color = comp.color,
-        parent = comp,
-        index = i,
-        links = {},
-        mouseCollider = Collider:rect{-1, -1, 1, 1},
-      }
+      comp:addOutput(i, inputNames[i])
     end
   end
 
@@ -945,6 +183,36 @@ function Logic:dup()
   return comp
 end
 
+-------- IO Connections --------
+
+function Logic:addInput(i, name)
+  i = i or #self.input
+  name = name or ''
+  table.insert(self.input, i, {
+    name = names,
+    default = Value:new{color = self.color},
+    mouseCollider = Collider:rect{-1, -1, 1, 1},
+    index = i,
+    parent = self,
+    --link = nil,
+    pick = pickInput,
+    class = 'Input',
+  })
+end
+
+function Logic:addOutput(i, name)
+  i = i or #self.output
+  name = name or ''
+  table.insert(self.output, i, Value:new{
+    name = name,
+    color = self.color,
+    parent = self,
+    index = i,
+    links = {},
+    mouseCollider = Collider:rect{-1, -1, 1, 1},
+  })
+end
+
 function Logic:link(o, other, i)
   if other.input[i].link then
     other:unlinkInput(i)
@@ -1000,6 +268,23 @@ function Logic:unlinkAll()
   self:unlinkAllInputs()
   self:unlinkAllOutputs()
 end
+
+-------- Update --------
+
+function Logic:update_internal()
+  self.shadow_output = self.shadow_output or {}
+  for i, v in ipairs(self.output) do
+    self.shadow_output[i] = v:dup()
+  end
+  self:update()
+  self.output, self.shadow_output = self.shadow_output, self.output
+end
+
+function Logic:update_external()
+  self.output, self.shadow_output = self.shadow_output, self.output
+end
+
+-------- Drawing --------
 
 function Logic:drawAll(cam)
   for _, func in ipairs{
@@ -1265,8 +550,13 @@ end
 
 function Logic:setColor(c)
   self.color = c
-  if type(self.default) == 'table' and self.default.class == 'Value' then
-    self.default.color = c
+  for _, v in ipairs{'default', 'visual',} do
+    if type(self[v]) == 'table' and self[v].class == 'Value' then
+      self[v]:setColor(c)
+    end
+  end
+  for i, v in ipairs(self.input) do
+    self.input[i].default:setColor(c)
   end
 end
 

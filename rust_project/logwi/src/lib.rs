@@ -73,5 +73,6 @@ mod tests {
     #[test]
     fn it_works() {
         assert_eq!(-(std::i32::MIN + 1), std::i32::MAX);
+        assert_eq!(-(std::i32::MIN + 1), std::i32::MAX);
     }
 }
